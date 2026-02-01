@@ -1,6 +1,7 @@
 import express from "express";
 import cron from "node-cron";
 import "dotenv/config";
+import { runStatementJob } from "./jobs/statement.job.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,10 +13,19 @@ app.get("/health", (_, res) => {
 
 // Cron placeholder (runs daily at 2 AM)
 cron.schedule("0 2 * * *", async () => {
-    console.log("[CRON] Job triggered");
-    // Statement processing will go here
+    console.log("[CRON] EMI job started");
+    await runStatementJob();
 });
 
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+});
+
+app.get("/test-full-run", async (_, res) => {
+    try {
+        await runStatementJob();
+        res.json({ status: "SUCCESS (DRY RUN)" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });

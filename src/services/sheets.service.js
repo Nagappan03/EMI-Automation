@@ -1,0 +1,50 @@
+import { google } from "googleapis";
+
+const sheets = new google.sheets("v4");
+
+function getAuth() {
+    return new google.auth.JWT(
+        process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        null,
+        process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+        ["https://www.googleapis.com/auth/spreadsheets"]
+    );
+}
+
+export async function updateTracker({
+    bank,
+    month,
+    year,
+    amount
+}) {
+    const auth = getAuth();
+
+    const range = "Tracker!A2:Z1000";
+    const res = await sheets.spreadsheets.values.get({
+        spreadsheetId: process.env.GOOGLE_SHEET_ID,
+        range,
+        auth
+    });
+
+    const rows = res.data.values || [];
+
+    const rowIndex = rows.findIndex(
+        r => r[1] === bank && r[3] === month && r[4] === year
+    );
+
+    if (rowIndex === -1) {
+        throw new Error(`Tracker row not found for ${bank} ${month}-${year}`);
+    }
+
+    const targetRow = rowIndex + 2;
+
+    await sheets.spreadsheets.values.update({
+        spreadsheetId: process.env.GOOGLE_SHEET_ID,
+        range: `Tracker!F${targetRow}:J${targetRow}`,
+        valueInputOption: "USER_ENTERED",
+        requestBody: {
+            values: [[amount, "", "", "Pending", "Pending"]]
+        },
+        auth
+    });
+}

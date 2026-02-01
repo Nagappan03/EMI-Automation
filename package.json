@@ -15,12 +15,15 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "canvas": "^3.2.1",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "googleapis": "^171.0.0",
     "node-cron": "^4.2.1",
+    "nodemailer": "^7.0.13",
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^2.4.5",
+    "pdfjs-dist": "^5.4.530",
     "sqlite3": "^5.1.7"
   },
   "devDependencies": {
