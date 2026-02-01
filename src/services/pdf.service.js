@@ -16,7 +16,6 @@ export async function decryptAndExtractText({
 
     // 1️⃣ Decrypt using qpdf
     try {
-        console.log("QPDF VERSION:", execSync("qpdf --version").toString());
         execSync(
             `qpdf --password=${password} --decrypt "${filePath}" "${decryptedPath}"`,
             { stdio: "ignore" }
