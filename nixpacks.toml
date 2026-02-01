@@ -1,5 +1,2 @@
 [phases.setup]
 aptPkgs = ["qpdf"]
-
-[providers.node]
-version = "20"
