@@ -1,7 +1,5 @@
 import { google } from "googleapis";
 
-const sheets = new google.sheets("v4");
-
 function getAuth() {
     return new google.auth.JWT(
         process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
@@ -11,19 +9,20 @@ function getAuth() {
     );
 }
 
-export async function updateTracker({
-    bank,
-    month,
-    year,
-    amount
-}) {
+export async function updateTracker({ bank, month, year, amount }) {
     const auth = getAuth();
 
+    // 🔑 Attach auth at client level (CRITICAL)
+    const sheets = google.sheets({
+        version: "v4",
+        auth
+    });
+
     const range = "Tracker!A2:Z1000";
+
     const res = await sheets.spreadsheets.values.get({
         spreadsheetId: process.env.GOOGLE_SHEET_ID,
-        range,
-        auth
+        range
     });
 
     const rows = res.data.values || [];
@@ -44,7 +43,6 @@ export async function updateTracker({
         valueInputOption: "USER_ENTERED",
         requestBody: {
             values: [[amount, "", "", "Pending", "Pending"]]
-        },
-        auth
+        }
     });
 }

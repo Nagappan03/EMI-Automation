@@ -2,6 +2,7 @@ import express from "express";
 import cron from "node-cron";
 import "dotenv/config";
 import { runStatementJob } from "./jobs/statement.job.js";
+import { google } from "googleapis";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -27,5 +28,24 @@ app.get("/test-full-run", async (_, res) => {
         res.json({ status: "SUCCESS (DRY RUN)" });
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+});
+
+app.get("/test-auth-token", async (_, res) => {
+    try {
+        const auth = new google.auth.JWT(
+            process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+            null,
+            process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+            ["https://www.googleapis.com/auth/spreadsheets"]
+        );
+
+        const token = await auth.authorize();
+        res.json({
+            success: true,
+            tokenType: token.token_type
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
     }
 });
