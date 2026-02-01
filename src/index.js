@@ -33,10 +33,22 @@ app.get("/test-full-run", async (_, res) => {
 
 app.get("/test-auth-token", async (_, res) => {
     try {
+        const privateKey = process.env.GOOGLE_PRIVATE_KEY
+            ?.replace(/\\n/g, "\n")
+            ?.replace(/\n/g, "\n")
+            ?.trim();
+
+        if (!privateKey) {
+            throw new Error("GOOGLE_PRIVATE_KEY is missing or empty at runtime");
+        }
+
+        console.log("PRIVATE KEY LENGTH:", privateKey.length);
+        console.log("PRIVATE KEY STARTS WITH:", privateKey.slice(0, 30));
+
         const auth = new google.auth.JWT(
             process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
             null,
-            process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+            privateKey,
             ["https://www.googleapis.com/auth/spreadsheets"]
         );
 
