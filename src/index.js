@@ -32,6 +32,7 @@ app.get("/test-full-run", async (_, res) => {
 });
 
 app.get("/test-auth-token", async (_, res) => {
+    console.log("GAC path:", process.env.GOOGLE_APPLICATION_CREDENTIALS);
     try {
         const privateKey = process.env.GOOGLE_PRIVATE_KEY
             ?.replace(/\\n/g, "\n")
