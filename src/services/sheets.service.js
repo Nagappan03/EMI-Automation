@@ -1,30 +1,10 @@
 import { google } from "googleapis";
 
-function getAuth() {
-    const privateKey = process.env.GOOGLE_PRIVATE_KEY
-        ?.replace(/\\n/g, "\n")
-        ?.replace(/\n/g, "\n")
-        ?.trim();
-
-    if (!privateKey) {
-        throw new Error("GOOGLE_PRIVATE_KEY is missing or empty at runtime");
-    }
-
-    console.log("PRIVATE KEY LENGTH:", privateKey.length);
-    console.log("PRIVATE KEY STARTS WITH:", privateKey.slice(0, 30));
-
-    return new google.auth.JWT(
-        process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-        null,
-        privateKey,
-        ["https://www.googleapis.com/auth/spreadsheets"]
-    );
-}
-
 export async function updateTracker({ bank, month, year, amount }) {
-    const auth = getAuth();
+    const auth = new google.auth.GoogleAuth({
+        scopes: ["https://www.googleapis.com/auth/spreadsheets"]
+    });
 
-    // 🔑 Attach auth at client level (CRITICAL)
     const sheets = google.sheets({
         version: "v4",
         auth
