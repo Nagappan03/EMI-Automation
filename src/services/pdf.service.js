@@ -3,8 +3,6 @@ import path from "path";
 import { execSync } from "child_process";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 
-console.log("QPDF VERSION:", execSync("qpdf --version").toString());
-
 export async function decryptAndExtractText({
     filePath,
     password,
@@ -18,6 +16,7 @@ export async function decryptAndExtractText({
 
     // 1️⃣ Decrypt using qpdf
     try {
+        console.log("QPDF VERSION:", execSync("qpdf --version").toString());
         execSync(
             `qpdf --password=${password} --decrypt "${filePath}" "${decryptedPath}"`,
             { stdio: "ignore" }
