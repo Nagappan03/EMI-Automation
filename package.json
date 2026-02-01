@@ -1,0 +1,29 @@
+{
+  "name": "emi-automation-project",
+  "version": "1.0.0",
+  "description": "This is a side project built for fetching the credit card statements from Gmail & updating it in Google Sheets using Automation",
+  "type": "module",
+  "main": "index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "nodemon src/index.js",
+    "start": "node src/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "googleapis": "^171.0.0",
+    "node-cron": "^4.2.1",
+    "pdf-lib": "^1.17.1",
+    "pdf-parse": "^2.4.5",
+    "sqlite3": "^5.1.7"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.11"
+  }
+}
