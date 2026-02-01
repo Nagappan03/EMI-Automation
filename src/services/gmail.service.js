@@ -3,6 +3,38 @@ import fs from "fs";
 import path from "path";
 import { getOAuthClient } from "./gmail.auth.js";
 
+const MONTH_MAP = {
+    January: "Jan",
+    February: "Feb",
+    March: "Mar",
+    April: "Apr",
+    May: "May",
+    June: "Jun",
+    July: "Jul",
+    August: "Aug",
+    September: "Sep",
+    October: "Oct",
+    November: "Nov",
+    December: "Dec"
+};
+
+function extractMonthYearFromAxisSubject(subject) {
+    // Example:
+    // "Your Axis Bank Visa Privilege Credit Card Statement ending XX51 - January 2026"
+    const match = subject.match(
+        /-\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})/
+    );
+
+    if (!match) {
+        throw new Error("[Axis] Unable to extract month/year from subject");
+    }
+
+    return {
+        statementMonth: MONTH_MAP[match[1]],
+        statementYear: match[2]
+    };
+}
+
 export async function fetchAxisStatement() {
     const oauth2Client = getOAuthClient();
     oauth2Client.setCredentials({
@@ -27,6 +59,16 @@ export async function fetchAxisStatement() {
         id: msgId
     });
 
+    const headers = msg.data.payload.headers || [];
+    const subjectHeader = headers.find(h => h.name === "Subject");
+
+    if (!subjectHeader) {
+        throw new Error("[Axis] Subject header not found");
+    }
+
+    const { statementMonth, statementYear } =
+        extractMonthYearFromAxisSubject(subjectHeader.value);
+
     const parts = msg.data.payload.parts || [];
     const attachmentPart = parts.find(p => p.filename.endsWith(".pdf"));
 
@@ -40,8 +82,13 @@ export async function fetchAxisStatement() {
 
     const buffer = Buffer.from(att.data.data, "base64");
 
-    const filePath = path.join("/tmp", `${bank}.pdf`);
+    const filePath = path.join("/tmp", "axis-statement.pdf");
     fs.writeFileSync(filePath, buffer);
 
-    return filePath;
+    return {
+        statementKey: msgId,
+        pdfPath: filePath,
+        statementMonth,
+        statementYear
+    };
 }

@@ -2,8 +2,8 @@ import { google } from "googleapis";
 
 export async function updateAxisTracker({
     amount,
-    statementMonth,
-    statementYear,
+    month,
+    year,
     currentInstallment,
     totalInstallments
 }) {
@@ -32,18 +32,14 @@ export async function updateAxisTracker({
 
     const targetRow = rowIndex + 2;
 
-    // Compute next month/year (T + 1)
-    const { month: nextMonth, year: nextYear } =
-        getNextMonthYear(statementMonth, statementYear);
-
     await sheets.spreadsheets.values.update({
         spreadsheetId: sheetId,
         range: `Tracker!D${targetRow}:J${targetRow}`,
         valueInputOption: "USER_ENTERED",
         requestBody: {
             values: [[
-                nextMonth,                  // Month
-                nextYear,                   // Year
+                month,                  // Month
+                year,                   // Year
                 amount,                     // Amount
                 totalInstallments,          // Total Installments
                 currentInstallment,         // Current Installment
