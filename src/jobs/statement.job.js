@@ -1,16 +1,14 @@
 import { fetchAxisStatement } from "../services/gmail.service.js";
 import { decryptAndExtractText } from "../services/pdf.service.js";
 import { updateAxisTracker } from "../services/sheets.service.js";
+import { extractAxisInstallmentInfo } from "../utils/axis.utils.js";
 
 import { fetchKotakStatement } from "../services/gmail.service.js";
-import { extractKotakAmount } from "../utils/kotak.utils.js";
-import { updateKotakTracker } from "../services/sheets.service.js";
-
-import { extractAxisInstallmentInfo } from "../utils/axis.utils.js";
 import {
     extractKotakAmount,
     extractKotakInstallmentInfo
 } from "../utils/kotak.utils.js";
+import { updateKotakTracker } from "../services/sheets.service.js";
 
 import { getNextMonthYear } from "../utils/date.utils.js";
 
