@@ -2,7 +2,16 @@ import { fetchAxisStatement } from "../services/gmail.service.js";
 import { decryptAndExtractText } from "../services/pdf.service.js";
 import { updateAxisTracker } from "../services/sheets.service.js";
 
+import { fetchKotakStatement } from "../services/gmail.service.js";
+import { extractKotakAmount } from "../utils/kotak.utils.js";
+import { updateKotakTracker } from "../services/sheets.service.js";
+
 import { extractAxisInstallmentInfo } from "../utils/axis.utils.js";
+import {
+    extractKotakAmount,
+    extractKotakInstallmentInfo
+} from "../utils/kotak.utils.js";
+
 import { getNextMonthYear } from "../utils/date.utils.js";
 
 import {
@@ -16,12 +25,8 @@ import {
  */
 export async function runStatementJob() {
     console.log("[JOB] Statement job started");
-
-    // ===============================
-    // AXIS BANK FLOW (ONLY)
-    // ===============================
     await processAxisStatement();
-
+    await processKotakStatement();
     console.log("[JOB] Statement job completed");
 }
 
@@ -85,6 +90,55 @@ async function processAxisStatement() {
     await markStatementProcessed(statementKey);
 
     console.log(`[AXIS] Successfully processed statement ${statementKey}`);
+}
+
+async function processKotakStatement() {
+    console.log("[KOTAK] Processing Kotak statement");
+
+    const kotakData = await fetchKotakStatement();
+
+    if (!kotakData) {
+        console.log("[KOTAK] No statement found. Skipping.");
+        return;
+    }
+
+    const {
+        statementKey,
+        pdfPath,
+        statementMonth,
+        statementYear
+    } = kotakData;
+
+    if (await isStatementProcessed(statementKey)) {
+        console.log(`[KOTAK] Already processed: ${statementKey}`);
+        return;
+    }
+
+    const statementText = await decryptAndExtractText({
+        filePath: pdfPath,
+        password: process.env.KOTAK_PDF_PASSWORD,
+        bank: "Kotak"
+    });
+
+    const amount = extractKotakAmount(statementText);
+
+    const { currentInstallment, totalInstallments } =
+        extractKotakInstallmentInfo(statementText);
+
+    const { month: nextMonth, year: nextYear } =
+        getNextMonthYear(statementMonth, statementYear);
+
+    await updateKotakTracker({
+        amount,
+        month: nextMonth,
+        year: nextYear,
+        currentInstallment,
+        totalInstallments
+    });
+
+    await markStatementProcessed(statementKey);
+
+    console.log(`[KOTAK] Successfully processed ${statementKey}`);
 }
 
 /**

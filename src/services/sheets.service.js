@@ -48,3 +48,51 @@ export async function updateAxisTracker({
         }
     });
 }
+
+export async function updateKotakTracker({
+    amount,
+    month,
+    year,
+    currentInstallment,
+    totalInstallments
+}) {
+    const auth = new google.auth.GoogleAuth({
+        scopes: ["https://www.googleapis.com/auth/spreadsheets"]
+    });
+
+    const sheets = google.sheets({ version: "v4", auth });
+
+    const sheetId = process.env.GOOGLE_SHEET_ID;
+    const range = "Tracker!A2:Z1000";
+
+    const res = await sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range
+    });
+
+    const rows = res.data.values || [];
+
+    const rowIndex = rows.findIndex(r => r[1] === "Kotak");
+
+    if (rowIndex === -1) {
+        throw new Error("Kotak row not found in tracker");
+    }
+
+    const targetRow = rowIndex + 2;
+
+    await sheets.spreadsheets.values.update({
+        spreadsheetId: sheetId,
+        range: `Tracker!D${targetRow}:J${targetRow}`,
+        valueInputOption: "USER_ENTERED",
+        requestBody: {
+            values: [[
+                month,
+                year,
+                amount,
+                totalInstallments,
+                currentInstallment,
+                "Pending"
+            ]]
+        }
+    });
+}
