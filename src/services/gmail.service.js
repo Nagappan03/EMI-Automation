@@ -43,7 +43,7 @@ export async function fetchAxisStatement() {
 
     const gmail = google.gmail({ version: "v1", auth: oauth2Client });
 
-    const query = 'from:cc.statements@axisbank.com "ending XX51" has:attachment';
+    const query = 'from:cc.statements@axis XX51 has:attachment';
 
     const res = await gmail.users.messages.list({
         userId: "me",
@@ -114,12 +114,12 @@ export async function fetchKotakStatement() {
 
     const gmail = google.gmail({ version: "v1", auth: oauth2Client });
 
-    const query = "from:cardstatement@kotak.bank.in has:attachment";
+    const query = "from:cardstatement@kotak has:attachment";
 
     const res = await gmail.users.messages.list({
         userId: "me",
         q: query,
-        maxResults: 5
+        maxResults: 20
     });
 
     if (!res.data.messages?.length) return null;
