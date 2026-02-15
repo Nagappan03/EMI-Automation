@@ -117,8 +117,6 @@ async function processKotakStatement() {
         bank: "Kotak"
     });
 
-    console.log("[KOTAK] Statement text:", statementText.slice(0, 500));
-
     const { statementMonth, statementYear } =
         extractKotakMonthYear(statementText);
 

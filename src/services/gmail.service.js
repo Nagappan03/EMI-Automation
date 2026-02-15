@@ -48,7 +48,7 @@ export async function fetchAxisStatement() {
     const res = await gmail.users.messages.list({
         userId: "me",
         q: query,
-        maxResults: 10
+        maxResults: 20
     });
 
     if (!res.data.messages?.length) return null;
@@ -67,19 +67,17 @@ export async function fetchAxisStatement() {
         if (!subjectHeader) continue;
 
         const { statementMonth, statementYear } =
-            extractMonthYearFromAxisSubject(subjectHeader.value);
+            extractAxisMonthYearFromSubject(subjectHeader.value);
 
-        const timestamp = new Date(
-            `${statementMonth} 1, ${statementYear}`
-        ).getTime();
+        const internalTimestamp = Number(msg.data.internalDate);
 
-        if (!latest || timestamp > latest.timestamp) {
+        if (!latest || internalTimestamp > latest.internalTimestamp) {
             latest = {
                 id: m.id,
                 msg,
                 statementMonth,
                 statementYear,
-                timestamp
+                internalTimestamp
             };
         }
     }
