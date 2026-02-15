@@ -92,7 +92,7 @@ async function processAxisStatement() {
 }
 
 async function processKotakStatement() {
-    console.log("[KOTAK] Processing Kotak statement");
+    console.log("[KOTAK] Processing Kotak Bank statement");
 
     const kotakData = await fetchKotakStatement();
 
@@ -111,6 +111,8 @@ async function processKotakStatement() {
         return;
     }
 
+    console.log(`[KOTAK] New statement detected: ${statementKey}`);
+
     const statementText = await decryptAndExtractText({
         filePath: pdfPath,
         password: process.env.KOTAK_PDF_PASSWORD,
@@ -121,6 +123,10 @@ async function processKotakStatement() {
         extractKotakMonthYear(statementText);
 
     const amount = extractKotakAmount(statementText);
+
+    console.log(
+        `[KOTAK] EMI calculated → Total Amount Due: ${amount}`
+    );
 
     const { currentInstallment, totalInstallments } =
         extractKotakInstallmentInfo(statementText);
@@ -138,7 +144,7 @@ async function processKotakStatement() {
 
     await markStatementProcessed(statementKey);
 
-    console.log(`[KOTAK] Successfully processed ${statementKey}`);
+    console.log(`[KOTAK] Successfully processed statement ${statementKey}`);
 }
 
 /**
