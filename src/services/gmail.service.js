@@ -67,7 +67,7 @@ export async function fetchAxisStatement() {
         if (!subjectHeader) continue;
 
         const { statementMonth, statementYear } =
-            extractAxisMonthYearFromSubject(subjectHeader.value);
+            extractMonthYearFromAxisSubject(subjectHeader.value);
 
         const internalTimestamp = Number(msg.data.internalDate);
 
