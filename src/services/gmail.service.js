@@ -43,40 +43,55 @@ export async function fetchAxisStatement() {
 
     const gmail = google.gmail({ version: "v1", auth: oauth2Client });
 
-    const query = "from:cc.statements@axisbank.com ending XX51";
+    const query = 'from:cc.statements@axisbank.com "ending XX51" has:attachment';
 
     const res = await gmail.users.messages.list({
         userId: "me",
         q: query,
-        maxResults: 5
+        maxResults: 10
     });
 
     if (!res.data.messages?.length) return null;
 
-    const msgId = res.data.messages[0].id;
-    const msg = await gmail.users.messages.get({
-        userId: "me",
-        id: msgId
-    });
+    let latest = null;
 
-    const headers = msg.data.payload.headers || [];
-    const subjectHeader = headers.find(h => h.name === "Subject");
+    for (const m of res.data.messages) {
+        const msg = await gmail.users.messages.get({
+            userId: "me",
+            id: m.id
+        });
 
-    if (!subjectHeader) {
-        throw new Error("[Axis] Subject header not found");
+        const headers = msg.data.payload.headers || [];
+        const subjectHeader = headers.find(h => h.name === "Subject");
+
+        if (!subjectHeader) continue;
+
+        const { statementMonth, statementYear } =
+            extractMonthYearFromAxisSubject(subjectHeader.value);
+
+        const timestamp = new Date(
+            `${statementMonth} 1, ${statementYear}`
+        ).getTime();
+
+        if (!latest || timestamp > latest.timestamp) {
+            latest = {
+                id: m.id,
+                msg,
+                statementMonth,
+                statementYear,
+                timestamp
+            };
+        }
     }
 
-    const { statementMonth, statementYear } =
-        extractMonthYearFromAxisSubject(subjectHeader.value);
-
-    const parts = msg.data.payload.parts || [];
+    const parts = latest.msg.data.payload.parts || [];
     const attachmentPart = parts.find(p => p.filename.endsWith(".pdf"));
 
-    if (!attachmentPart) throw new Error("No PDF attachment found");
+    if (!attachmentPart) throw new Error("[Axis] No PDF attachment found");
 
     const att = await gmail.users.messages.attachments.get({
         userId: "me",
-        messageId: msgId,
+        messageId: latest.id,
         id: attachmentPart.body.attachmentId
     });
 
@@ -86,10 +101,10 @@ export async function fetchAxisStatement() {
     fs.writeFileSync(filePath, buffer);
 
     return {
-        statementKey: msgId,
+        statementKey: latest.id,
         pdfPath: filePath,
-        statementMonth,
-        statementYear
+        statementMonth: latest.statementMonth,
+        statementYear: latest.statementYear
     };
 }
 

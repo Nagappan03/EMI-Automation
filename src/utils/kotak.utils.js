@@ -1,12 +1,13 @@
 /**
- * Extract month and year from Kotak email body
- * Example: "Statement for Dec-2025"
+ * Extract month and year from Kotak PDF
+ * Example:
+ * Statement Date 25-Jan-2026
  */
 export function extractKotakMonthYear(text) {
-    const match = text.match(/Statement for (\w+)-(\d{4})/);
+    const match = text.match(/Statement Date\s+\d{1,2}-(\w{3})-(\d{4})/);
 
     if (!match) {
-        throw new Error("[Kotak] Unable to extract month/year");
+        throw new Error("[Kotak] Unable to extract month/year from Statement Date");
     }
 
     return {
