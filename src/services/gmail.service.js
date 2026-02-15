@@ -43,7 +43,7 @@ export async function fetchAxisStatement() {
 
     const gmail = google.gmail({ version: "v1", auth: oauth2Client });
 
-    const query = 'from:cc.statements@axis XX51 has:attachment';
+    const query = 'from:"cc.statements" (subject:XX51 OR subject:5851) has:attachment';
 
     const res = await gmail.users.messages.list({
         userId: "me",
@@ -114,7 +114,7 @@ export async function fetchKotakStatement() {
 
     const gmail = google.gmail({ version: "v1", auth: oauth2Client });
 
-    const query = "from:cardstatement@kotak has:attachment";
+    const query = 'from:"cardstatement" subject:"Credit Card" has:attachment';
 
     const res = await gmail.users.messages.list({
         userId: "me",
@@ -124,24 +124,42 @@ export async function fetchKotakStatement() {
 
     if (!res.data.messages?.length) return null;
 
-    const msgId = res.data.messages[0].id;
+    let latest = null;
 
-    const msg = await gmail.users.messages.get({
-        userId: "me",
-        id: msgId
-    });
+    for (const m of res.data.messages) {
+        const msg = await gmail.users.messages.get({
+            userId: "me",
+            id: m.id
+        });
 
-    const parts = msg.data.payload.parts || [];
-    const attachmentPart = parts.find(p => p.filename.endsWith(".pdf"));
+        const internalTimestamp = Number(msg.data.internalDate);
 
-    if (!attachmentPart) {
-        throw new Error("[Kotak] No PDF attachment found");
+        // Ensure it has PDF attachment
+        const parts = msg.data.payload.parts || [];
+        const attachmentPart = parts.find(p => p.filename?.endsWith(".pdf"));
+
+        if (!attachmentPart) continue;
+
+        // Pick newest based on Gmail internalDate
+        if (!latest || internalTimestamp > latest.internalTimestamp) {
+            latest = {
+                id: m.id,
+                msg,
+                attachmentPart,
+                internalTimestamp
+            };
+        }
+    }
+
+    if (!latest) {
+        console.log("[KOTAK] No valid PDF statement found.");
+        return null;
     }
 
     const att = await gmail.users.messages.attachments.get({
         userId: "me",
-        messageId: msgId,
-        id: attachmentPart.body.attachmentId
+        messageId: latest.id,
+        id: latest.attachmentPart.body.attachmentId
     });
 
     const buffer = Buffer.from(att.data.data, "base64");
@@ -150,7 +168,7 @@ export async function fetchKotakStatement() {
     fs.writeFileSync(filePath, buffer);
 
     return {
-        statementKey: msgId,
-        pdfPath: filePath,
+        statementKey: latest.id,
+        pdfPath: filePath
     };
 }
