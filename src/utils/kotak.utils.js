@@ -17,13 +17,15 @@ export function extractKotakMonthYear(text) {
 }
 
 /**
- * Extract EMI amount from Kotak PDF
+ * Extract Total Amount Due (TAD) from Kotak statement
  */
 export function extractKotakAmount(text) {
-    const match = text.match(/Total Payment Due\s+([\d,]+\.\d{2})/);
+    const match = text.match(
+        /Total Amount Due\s*\(TAD\)\s*Rs\.\s*([\d,]+\.\d{2})/
+    );
 
     if (!match) {
-        throw new Error("[Kotak] Total Payment Due not found");
+        throw new Error("[Kotak] Total Amount Due (TAD) not found");
     }
 
     return parseFloat(match[1].replace(/,/g, ""));
