@@ -6,7 +6,8 @@ import { extractAxisInstallmentInfo } from "../utils/axis.utils.js";
 import { fetchKotakStatement } from "../services/gmail.service.js";
 import {
     extractKotakAmount,
-    extractKotakInstallmentInfo
+    extractKotakInstallmentInfo,
+    extractKotakMonthYear
 } from "../utils/kotak.utils.js";
 import { updateKotakTracker } from "../services/sheets.service.js";
 
@@ -103,8 +104,6 @@ async function processKotakStatement() {
     const {
         statementKey,
         pdfPath,
-        statementMonth,
-        statementYear
     } = kotakData;
 
     if (await isStatementProcessed(statementKey)) {
@@ -117,6 +116,11 @@ async function processKotakStatement() {
         password: process.env.KOTAK_PDF_PASSWORD,
         bank: "Kotak"
     });
+
+    console.log("[KOTAK] Statement text:", statementText.slice(0, 500));
+
+    const { statementMonth, statementYear } =
+        extractKotakMonthYear(statementText);
 
     const amount = extractKotakAmount(statementText);
 

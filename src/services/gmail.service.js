@@ -2,7 +2,6 @@ import { google } from "googleapis";
 import fs from "fs";
 import path from "path";
 import { getOAuthClient } from "./gmail.auth.js";
-import { extractKotakMonthYear } from "../utils/kotak.utils.js";
 
 const MONTH_MAP = {
     January: "Jan",
@@ -137,15 +136,8 @@ export async function fetchKotakStatement() {
     const filePath = path.join("/tmp", "kotak-statement.pdf");
     fs.writeFileSync(filePath, buffer);
 
-    const bodyText = msg.data.snippet || "";
-
-    const { statementMonth, statementYear } =
-        extractKotakMonthYear(bodyText);
-
     return {
         statementKey: msgId,
         pdfPath: filePath,
-        statementMonth,
-        statementYear
     };
 }
