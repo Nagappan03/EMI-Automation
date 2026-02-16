@@ -32,9 +32,19 @@ app.get("/health", (_, res) => {
 });
 
 // Cron placeholder (runs daily at 2 AM)
-cron.schedule("0 2 * * *", async () => {
-    console.log("[CRON] EMI job started");
-    await runStatementJob();
+cron.schedule("*/2 * * * *", async () => {
+    try {
+        const now = new Date().toISOString();
+        console.log(`[CRON] EMI job triggered at ${now}`);
+
+        fs.writeFileSync("/tmp/last-cron-run.txt", now);
+
+        await runStatementJob();
+
+        console.log("[CRON] EMI job completed successfully");
+    } catch (err) {
+        console.error("[CRON ERROR]", err);
+    }
 });
 
 app.listen(PORT, () => {
@@ -57,5 +67,15 @@ app.get("/test-full-run", async (req, res) => {
         res.status(500).json({
             error: err.message
         });
+    }
+});
+
+// endpoint to test when the cron job was last run
+app.get("/last-cron-run", (req, res) => {
+    try {
+        const data = fs.readFileSync("/tmp/last-cron-run.txt", "utf8");
+        res.json({ lastCronRun: data });
+    } catch {
+        res.json({ lastCronRun: null });
     }
 });
