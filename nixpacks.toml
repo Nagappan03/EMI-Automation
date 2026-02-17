@@ -1,3 +1,0 @@
-[phases.setup]
-aptPkgs = ["qpdf"]
-nixPkgs = ["nodejs_20_19"]
