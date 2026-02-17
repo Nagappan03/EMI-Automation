@@ -1,0 +1,25 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model JobRun {
+  id           String   @id @default(cuid())
+  startedAt    DateTime @default(now())
+  completedAt  DateTime?
+  status       String
+  axisStatus   String?
+  kotakStatus  String?
+  errorMessage String?
+}
+
+model ProcessedStatement {
+  id           String   @id @default(cuid())
+  bank         String
+  statementKey String   @unique
+  processedAt  DateTime @default(now())
+}
