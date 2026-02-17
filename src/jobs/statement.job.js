@@ -18,15 +18,65 @@ import {
     markStatementProcessed
 } from "../services/idempotency.service.js";
 
+import prisma from "../lib/prisma.js";
+
 /**
  * Main job entry point
  * This is what /test-full-run and cron will call
  */
 export async function runStatementJob() {
     console.log("[JOB] Statement job started");
-    await processAxisStatement();
-    await processKotakStatement();
-    console.log("[JOB] Statement job completed");
+
+    const job = await prisma.jobRun.create({
+        data: {
+            status: "RUNNING",
+        },
+    });
+
+    let axisStatus = "SKIPPED";
+    let kotakStatus = "SKIPPED";
+
+    try {
+        try {
+            await processAxisStatement();
+            axisStatus = "SUCCESS";
+        } catch (err) {
+            axisStatus = "FAILED";
+            console.error("[AXIS ERROR]", err);
+        }
+
+        try {
+            await processKotakStatement();
+            kotakStatus = "SUCCESS";
+        } catch (err) {
+            kotakStatus = "FAILED";
+            console.error("[KOTAK ERROR]", err);
+        }
+
+        await prisma.jobRun.update({
+            where: { id: job.id },
+            data: {
+                completedAt: new Date(),
+                status: "SUCCESS",
+                axisStatus,
+                kotakStatus,
+            },
+        });
+
+        console.log("[JOB] Statement job completed");
+    } catch (err) {
+        await prisma.jobRun.update({
+            where: { id: job.id },
+            data: {
+                completedAt: new Date(),
+                status: "FAILED",
+                errorMessage: err.message,
+            },
+        });
+
+        console.error("[JOB ERROR]", err);
+        throw err;
+    }
 }
 
 /**
@@ -86,11 +136,14 @@ async function processAxisStatement() {
     });
 
     // 8. Mark statement as processed (idempotency lock)
-    await markStatementProcessed(statementKey);
+    await markStatementProcessed(statementKey, "AXIS");
 
     console.log(`[AXIS] Successfully processed statement ${statementKey}`);
 }
 
+/**
+ * Process Kotak Bank credit card statement
+ */
 async function processKotakStatement() {
     console.log("[KOTAK] Processing Kotak Bank statement");
 
@@ -142,7 +195,7 @@ async function processKotakStatement() {
         totalInstallments
     });
 
-    await markStatementProcessed(statementKey);
+    await markStatementProcessed(statementKey, "KOTAK");
 
     console.log(`[KOTAK] Successfully processed statement ${statementKey}`);
 }

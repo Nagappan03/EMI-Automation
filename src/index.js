@@ -4,6 +4,7 @@ import "dotenv/config";
 import fs from "fs";
 import path from "path";
 import { runStatementJob } from "./jobs/statement.job.js";
+import prisma from "./lib/prisma.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -49,6 +50,35 @@ cron.schedule("30 20 * * *", async () => {
 
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+});
+
+// TEMPORARY — remove after first successful live run
+app.get("/test-full-run", async (req, res) => {
+    try {
+        console.log("[TEST] Manual full run triggered");
+
+        await runStatementJob();
+
+        res.json({
+            status: "SUCCESS",
+            mode: process.env.DRY_RUN === "true" ? "DRY_RUN" : "LIVE_RUN"
+        });
+    } catch (err) {
+        console.error("[TEST FULL RUN ERROR]", err);
+        res.status(500).json({
+            error: err.message
+        });
+    }
+});
+
+// admin endpoint to check job history
+app.get("/admin/job-history", async (req, res) => {
+    const jobs = await prisma.jobRun.findMany({
+        orderBy: { startedAt: "desc" },
+        take: 10,
+    });
+
+    res.json(jobs);
 });
 
 // endpoint to test when the cron job was last run
