@@ -6,8 +6,6 @@ import path from "path";
 import { runStatementJob } from "./jobs/statement.job.js";
 import prisma from "./lib/prisma.js";
 
-import fs from "fs";
-
 console.log("CWD:", process.cwd());
 console.log("Generated folder exists:",
     fs.existsSync("./src/generated/prisma"));
