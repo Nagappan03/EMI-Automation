@@ -13,70 +13,61 @@ import { updateKotakTracker } from "../services/sheets.service.js";
 
 import { getNextMonthYear } from "../utils/date.utils.js";
 
-import {
-    isStatementProcessed,
-    markStatementProcessed
-} from "../services/idempotency.service.js";
-
 import prisma from "../lib/prisma.js";
 
 /**
  * Main job entry point
  * This is what /test-full-run and cron will call
  */
-export async function runStatementJob() {
+export async function runStatementJob(triggeredBy = "CRON") {
     console.log("[JOB] Statement job started");
 
-    const job = await prisma.jobRun.create({
+    const jobRun = await prisma.jobRun.create({
         data: {
             status: "RUNNING",
-        },
+            triggeredBy
+        }
     });
 
     let axisStatus = "SKIPPED";
     let kotakStatus = "SKIPPED";
+    let overallStatus = "SUCCESS";
+    let errorMessage = null;
 
     try {
-        try {
-            await processAxisStatement();
-            axisStatus = "SUCCESS";
-        } catch (err) {
-            axisStatus = "FAILED";
-            console.error("[AXIS ERROR]", err);
-        }
-
-        try {
-            await processKotakStatement();
-            kotakStatus = "SUCCESS";
-        } catch (err) {
-            kotakStatus = "FAILED";
-            console.error("[KOTAK ERROR]", err);
-        }
-
-        await prisma.jobRun.update({
-            where: { id: job.id },
-            data: {
-                completedAt: new Date(),
-                status: "SUCCESS",
-                axisStatus,
-                kotakStatus,
-            },
-        });
-
-        console.log("[JOB] Statement job completed");
+        axisStatus = await processAxisStatement();
     } catch (err) {
-        await prisma.jobRun.update({
-            where: { id: job.id },
-            data: {
-                completedAt: new Date(),
-                status: "FAILED",
-                errorMessage: err.message,
-            },
-        });
-
-        console.error("[JOB ERROR]", err);
-        throw err;
+        axisStatus = "FAILED";
+        overallStatus = "FAILED";
+        errorMessage = errorMessage
+            ? errorMessage + ` | Axis: ${err.message}`
+            : `Axis: ${err.message}`;
     }
+
+    try {
+        kotakStatus = await processKotakStatement();
+    } catch (err) {
+        kotakStatus = "FAILED";
+        overallStatus = "FAILED";
+        errorMessage = errorMessage
+            ? errorMessage + ` | Kotak: ${err.message}`
+            : `Kotak: ${err.message}`;
+    }
+
+    await prisma.jobRun.update({
+        where: { id: jobRun.id },
+        data: {
+            status: overallStatus,
+            axisStatus,
+            kotakStatus,
+            errorMessage,
+            completedAt: new Date()
+        }
+    });
+
+    console.log("[JOB] Statement job completed");
+
+    return overallStatus;
 }
 
 /**
@@ -89,8 +80,8 @@ async function processAxisStatement() {
     const axisData = await fetchAxisStatement();
 
     if (!axisData) {
-        console.log("[AXIS] No Axis statement found. Skipping.");
-        return;
+        console.log("[AXIS] No statement found");
+        return "SKIPPED";
     }
 
     const {
@@ -100,10 +91,13 @@ async function processAxisStatement() {
         statementYear
     } = axisData;
 
-    // 2. Idempotency check
-    if (await isStatementProcessed(statementKey)) {
-        console.log(`[AXIS] Statement already processed: ${statementKey}`);
-        return;
+    const alreadyProcessed = await prisma.processedStatement.findUnique({
+        where: { statementKey: axisData.statementKey }
+    });
+
+    if (alreadyProcessed) {
+        console.log("[AXIS] Already processed");
+        return "SKIPPED";
     }
 
     console.log(`[AXIS] New statement detected: ${statementKey}`);
@@ -136,9 +130,16 @@ async function processAxisStatement() {
     });
 
     // 8. Mark statement as processed (idempotency lock)
-    await markStatementProcessed(statementKey, "AXIS");
+    await prisma.processedStatement.create({
+        data: {
+            bank: "AXIS",
+            statementKey: axisData.statementKey
+        }
+    });
 
-    console.log(`[AXIS] Successfully processed statement ${statementKey}`);
+    console.log('[AXIS] Successfully processed statement');
+
+    return "SUCCESS";
 }
 
 /**
@@ -150,18 +151,19 @@ async function processKotakStatement() {
     const kotakData = await fetchKotakStatement();
 
     if (!kotakData) {
-        console.log("[KOTAK] No statement found. Skipping.");
-        return;
+        console.log("[KOTAK] No statement found");
+        return "SKIPPED";
     }
 
-    const {
-        statementKey,
-        pdfPath,
-    } = kotakData;
+    const { statementKey, pdfPath } = kotakData;
 
-    if (await isStatementProcessed(statementKey)) {
-        console.log(`[KOTAK] Already processed: ${statementKey}`);
-        return;
+    const alreadyProcessed = await prisma.processedStatement.findUnique({
+        where: { statementKey: kotakData.statementKey }
+    });
+
+    if (alreadyProcessed) {
+        console.log('[KOTAK] Already processed');
+        return "SKIPPED";
     }
 
     console.log(`[KOTAK] New statement detected: ${statementKey}`);
@@ -177,10 +179,6 @@ async function processKotakStatement() {
 
     const amount = extractKotakAmount(statementText);
 
-    console.log(
-        `[KOTAK] EMI calculated → Total Amount Due: ${amount}`
-    );
-
     const { currentInstallment, totalInstallments } =
         extractKotakInstallmentInfo(statementText);
 
@@ -195,9 +193,16 @@ async function processKotakStatement() {
         totalInstallments
     });
 
-    await markStatementProcessed(statementKey, "KOTAK");
+    await prisma.processedStatement.create({
+        data: {
+            bank: "KOTAK",
+            statementKey: kotakData.statementKey
+        }
+    });
 
-    console.log(`[KOTAK] Successfully processed statement ${statementKey}`);
+    console.log('[KOTAK] Successfully processed statement');
+
+    return "SUCCESS";
 }
 
 /**

@@ -33,7 +33,7 @@ app.get("/health", (_, res) => {
 });
 
 // Cron placeholder (runs daily at 2 AM)
-cron.schedule("*/15 * * * *", async () => {
+cron.schedule("*/5 * * * *", async () => {
     try {
         const now = new Date().toISOString();
         console.log(`[CRON] EMI job triggered at ${now}`);
@@ -61,6 +61,35 @@ app.listen(PORT, () => {
         console.error("❌ DB connection failed", e);
     }
 })();
+
+// Get all runs
+app.get("/runs", async (req, res) => {
+    const runs = await prisma.jobRun.findMany({
+        orderBy: { startedAt: "desc" },
+        take: 50
+    });
+
+    res.json(runs);
+});
+
+// Get a specific run with id
+app.get("/runs/:id", async (req, res) => {
+    const run = await prisma.jobRun.findUnique({
+        where: { id: req.params.id }
+    });
+
+    res.json(run);
+});
+
+// Manual run
+app.post("/run-now", async (req, res) => {
+    try {
+        const result = await runStatementJob("MANUAL");
+        res.json({ status: result });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 // TEMPORARY — remove after first successful live run
 app.get("/test-full-run", async (req, res) => {

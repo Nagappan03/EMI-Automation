@@ -12,6 +12,7 @@ model JobRun {
   startedAt    DateTime @default(now())
   completedAt  DateTime?
   status       String
+  triggeredBy  String   @default("CRON")
   axisStatus   String?
   kotakStatus  String?
   errorMessage String?
