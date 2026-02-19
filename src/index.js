@@ -33,7 +33,7 @@ app.get("/health", (_, res) => {
 });
 
 // Cron placeholder (runs daily at 2 AM)
-cron.schedule("30 20 * * *", async () => {
+cron.schedule("* * * * *", async () => {
     try {
         const now = new Date().toISOString();
         console.log(`[CRON] EMI job triggered at ${now}`);
@@ -51,6 +51,16 @@ cron.schedule("30 20 * * *", async () => {
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
+
+// Test DB connection
+(async () => {
+    try {
+        await prisma.$queryRaw`SELECT 1`;
+        console.log("✅ Database connected");
+    } catch (e) {
+        console.error("❌ DB connection failed", e);
+    }
+})();
 
 // TEMPORARY — remove after first successful live run
 app.get("/test-full-run", async (req, res) => {
