@@ -6,6 +6,17 @@ import path from "path";
 import { runStatementJob } from "./jobs/statement.job.js";
 import prisma from "./lib/prisma.js";
 
+import fs from "fs";
+
+console.log("CWD:", process.cwd());
+console.log("Generated folder exists:",
+    fs.existsSync("./src/generated/prisma"));
+console.log("Generated files:",
+    fs.existsSync("./src/generated/prisma")
+        ? fs.readdirSync("./src/generated/prisma")
+        : "NO FOLDER"
+);
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
