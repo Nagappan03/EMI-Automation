@@ -33,7 +33,7 @@ app.get("/health", (_, res) => {
 });
 
 // Cron placeholder (runs daily at 2 AM)
-cron.schedule("* * * * *", async () => {
+cron.schedule("*/15 * * * *", async () => {
     try {
         const now = new Date().toISOString();
         console.log(`[CRON] EMI job triggered at ${now}`);
