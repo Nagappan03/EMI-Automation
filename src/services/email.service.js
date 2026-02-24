@@ -15,7 +15,7 @@ export async function sendFailureAlertEmail({
 
         const gmail = google.gmail({ version: "v1", auth: oauth2Client });
 
-        const subject = "🚨 EMI Automation FAILED";
+        const subject = "EMI Automation FAILED";
 
         const body = `
 EMI Automation Failure Alert

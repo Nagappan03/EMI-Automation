@@ -88,8 +88,6 @@ export async function runStatementJob(triggeredBy = "CRON") {
 async function processAxisStatement() {
     console.log("[AXIS] Processing Axis Bank statement");
 
-    throw new Error("TEST FAILURE"); // testing failure email
-
     // 1. Fetch Axis statement email + metadata
     const axisData = await fetchAxisStatement();
 
