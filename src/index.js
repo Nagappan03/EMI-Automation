@@ -66,10 +66,17 @@ app.listen(PORT, () => {
 app.get("/runs", async (req, res) => {
     const runs = await prisma.jobRun.findMany({
         orderBy: { startedAt: "desc" },
-        take: 50
+        take: 20
     });
 
-    res.json(runs);
+    const formatted = runs.map(run => ({
+        ...run,
+        durationSeconds: run.completedAt
+            ? Math.round((run.completedAt - run.startedAt) / 1000)
+            : null
+    }));
+
+    res.json(formatted);
 });
 
 // Get a specific run with id

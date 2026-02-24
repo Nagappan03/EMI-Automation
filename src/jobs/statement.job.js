@@ -12,6 +12,7 @@ import {
 import { updateKotakTracker } from "../services/sheets.service.js";
 
 import { getNextMonthYear } from "../utils/date.utils.js";
+import { sendFailureAlertEmail } from "../services/email.service.js";
 
 import prisma from "../lib/prisma.js";
 
@@ -54,6 +55,8 @@ export async function runStatementJob(triggeredBy = "CRON") {
             : `Kotak: ${err.message}`;
     }
 
+    const completedAt = new Date();
+
     await prisma.jobRun.update({
         where: { id: jobRun.id },
         data: {
@@ -61,9 +64,18 @@ export async function runStatementJob(triggeredBy = "CRON") {
             axisStatus,
             kotakStatus,
             errorMessage,
-            completedAt: new Date()
+            completedAt
         }
     });
+
+    if (overallStatus === "FAILED") {
+        await sendFailureAlertEmail({
+            axisStatus,
+            kotakStatus,
+            errorMessage,
+            triggeredBy
+        });
+    }
 
     console.log("[JOB] Statement job completed");
 
@@ -75,6 +87,8 @@ export async function runStatementJob(triggeredBy = "CRON") {
  */
 async function processAxisStatement() {
     console.log("[AXIS] Processing Axis Bank statement");
+
+    throw new Error("TEST FAILURE"); // testing failure email
 
     // 1. Fetch Axis statement email + metadata
     const axisData = await fetchAxisStatement();
