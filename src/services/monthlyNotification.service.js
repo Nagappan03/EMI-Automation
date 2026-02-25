@@ -1,6 +1,7 @@
 import prisma from "../lib/prisma.js";
 import { isLastDayOfMonth } from "../utils/date.monthly.js";
 import { sendMonthlyEmail } from "./email.service.js";
+import { sendWhatsAppMessage } from "./whatsapp.service.js";
 
 export async function runMonthlyNotification({ force = false } = {}) {
     const now = new Date();
@@ -22,8 +23,22 @@ export async function runMonthlyNotification({ force = false } = {}) {
         return;
     }
 
+    // 1️⃣ Email (mandatory)
     await sendMonthlyEmail();
 
+    // 2️⃣ WhatsApp (best effort)
+    try {
+        const monthName = now.toLocaleString("en-IN", { month: "long" });
+
+        await sendWhatsAppMessage({
+            to: "+916369837476",
+            body: `EMI Tracker updated for ${monthName} ${year}.\n\nView here:\nhttps://docs.google.com/spreadsheets/d/1yYSilofr_Cglmh2fmgaVO3WCeQddy1lRsE9qxVBJ_dw/edit`
+        });
+    } catch (err) {
+        console.error("[WHATSAPP ERROR - NON BLOCKING]", err.message);
+    }
+
+    // 3️⃣ Record as sent
     await prisma.monthlyNotification.create({
         data: {
             month,
@@ -32,5 +47,5 @@ export async function runMonthlyNotification({ force = false } = {}) {
         }
     });
 
-    console.log("[MONTHLY] Monthly email recorded in DB");
+    console.log("[MONTHLY] Monthly notification recorded");
 }
