@@ -2,6 +2,7 @@ import { fetchAxisStatement } from "../services/gmail.service.js";
 import { decryptAndExtractText } from "../services/pdf.service.js";
 import { updateAxisTracker } from "../services/sheets.service.js";
 import { extractAxisInstallmentInfo } from "../utils/axis.utils.js";
+import { withRetry } from "../utils/retry.utils.js";
 
 import { fetchKotakStatement } from "../services/gmail.service.js";
 import {
@@ -98,7 +99,10 @@ async function processAxisStatement() {
     console.log("[AXIS] Processing Axis Bank statement");
 
     // 1. Fetch Axis statement email + metadata
-    const axisData = await fetchAxisStatement();
+    const axisData = await withRetry(
+        () => fetchAxisStatement(),
+        { label: "Fetch Axis statement" }
+    );
 
     if (!axisData) {
         console.log("[AXIS] No statement found");
@@ -124,11 +128,14 @@ async function processAxisStatement() {
     console.log(`[AXIS] New statement detected: ${statementKey}`);
 
     // 3. Decrypt & extract text from PDF
-    const statementText = await decryptAndExtractText({
-        filePath: pdfPath,
-        password: process.env.AXIS_PDF_PASSWORD,
-        bank: "Axis"
-    });
+    const statementText = await withRetry(
+        () => decryptAndExtractText({
+            filePath: pdfPath,
+            password: process.env.AXIS_PDF_PASSWORD,
+            bank: "Axis"
+        }),
+        { label: "Decrypt Axis PDF" }
+    );
 
     // 4. Extract installment info (REF# based)
     const { currentInstallment, totalInstallments } =
@@ -142,13 +149,16 @@ async function processAxisStatement() {
         getNextMonthYear(statementMonth, statementYear);
 
     // 7. Update Google Sheet (single row, deterministic)
-    await updateAxisTracker({
-        amount: emiAmount,
-        month: nextMonth,
-        year: nextYear,
-        totalInstallments,
-        currentInstallment
-    });
+    await withRetry(
+        () => updateAxisTracker({
+            amount: emiAmount,
+            month: nextMonth,
+            year: nextYear,
+            totalInstallments,
+            currentInstallment
+        }),
+        { label: "Update Axis tracker" }
+    );
 
     // 8. Mark statement as processed (idempotency lock)
     await prisma.processedStatement.create({
@@ -169,7 +179,10 @@ async function processAxisStatement() {
 async function processKotakStatement() {
     console.log("[KOTAK] Processing Kotak Bank statement");
 
-    const kotakData = await fetchKotakStatement();
+    const kotakData = await withRetry(
+        () => fetchKotakStatement(),
+        { label: "Fetch Kotak statement" }
+    );
 
     if (!kotakData) {
         console.log("[KOTAK] No statement found");
@@ -189,11 +202,14 @@ async function processKotakStatement() {
 
     console.log(`[KOTAK] New statement detected: ${statementKey}`);
 
-    const statementText = await decryptAndExtractText({
-        filePath: pdfPath,
-        password: process.env.KOTAK_PDF_PASSWORD,
-        bank: "Kotak"
-    });
+    const statementText = await withRetry(
+        () => decryptAndExtractText({
+            filePath: pdfPath,
+            password: process.env.KOTAK_PDF_PASSWORD,
+            bank: "Kotak"
+        }),
+        { label: "Decrypt Kotak PDF" }
+    );
 
     const { statementMonth, statementYear } =
         extractKotakMonthYear(statementText);
@@ -206,13 +222,16 @@ async function processKotakStatement() {
     const { month: nextMonth, year: nextYear } =
         getNextMonthYear(statementMonth, statementYear);
 
-    await updateKotakTracker({
-        amount,
-        month: nextMonth,
-        year: nextYear,
-        currentInstallment,
-        totalInstallments
-    });
+    await withRetry(
+        () => updateKotakTracker({
+            amount,
+            month: nextMonth,
+            year: nextYear,
+            currentInstallment,
+            totalInstallments
+        }),
+        { label: "Update Kotak tracker" }
+    );
 
     await prisma.processedStatement.create({
         data: {
