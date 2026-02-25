@@ -6,6 +6,7 @@ import path from "path";
 import { runStatementJob } from "./jobs/statement.job.js";
 import prisma from "./lib/prisma.js";
 import { runMonthlyNotification } from "./services/monthlyNotification.service.js";
+import { sendWhatsAppMessage } from "./services/whatsapp.service.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
