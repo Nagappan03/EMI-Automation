@@ -23,6 +23,15 @@ import prisma from "../lib/prisma.js";
 export async function runStatementJob(triggeredBy = "CRON") {
     console.log("[JOB] Statement job started");
 
+    const existingRunning = await prisma.jobRun.findFirst({
+        where: { status: "RUNNING" }
+    });
+
+    if (existingRunning) {
+        console.log("[JOB] Another run already in progress. Skipping.");
+        return "SKIPPED_RUNNING";
+    }
+
     const jobRun = await prisma.jobRun.create({
         data: {
             status: "RUNNING",

@@ -27,9 +27,19 @@ process.env.GOOGLE_APPLICATION_CREDENTIALS = saPath;
 
 console.log("Google credentials written to:", saPath);
 
-// Health check (Railway needs this)
-app.get("/health", (_, res) => {
-    res.json({ status: "ok" });
+// Health check
+app.get("/health", async (req, res) => {
+    const runningJob = await prisma.jobRun.findFirst({
+        where: { status: "RUNNING" }
+    });
+
+    res.json({
+        status: "ok",
+        running: !!runningJob,
+        lastRun: await prisma.jobRun.findFirst({
+            orderBy: { startedAt: "desc" }
+        })
+    });
 });
 
 // Cron placeholder (runs daily at 2 AM)
@@ -37,8 +47,6 @@ cron.schedule("30 20 * * *", async () => {
     try {
         const now = new Date().toISOString();
         console.log(`[CRON] EMI job triggered at ${now}`);
-
-        fs.writeFileSync("/tmp/last-cron-run.txt", now);
 
         await runStatementJob();
 
@@ -98,6 +106,27 @@ app.post("/run-now", async (req, res) => {
     }
 });
 
+// Get system summary
+app.get("/system-summary", async (req, res) => {
+    const totalRuns = await prisma.jobRun.count();
+
+    const lastSuccess = await prisma.jobRun.findFirst({
+        where: { status: "SUCCESS" },
+        orderBy: { startedAt: "desc" }
+    });
+
+    const lastFailure = await prisma.jobRun.findFirst({
+        where: { status: "FAILED" },
+        orderBy: { startedAt: "desc" }
+    });
+
+    res.json({
+        totalRuns,
+        lastSuccess,
+        lastFailure
+    });
+});
+
 // TEMPORARY — remove after first successful live run
 app.get("/test-full-run", async (req, res) => {
     try {
@@ -114,25 +143,5 @@ app.get("/test-full-run", async (req, res) => {
         res.status(500).json({
             error: err.message
         });
-    }
-});
-
-// admin endpoint to check job history
-app.get("/admin/job-history", async (req, res) => {
-    const jobs = await prisma.jobRun.findMany({
-        orderBy: { startedAt: "desc" },
-        take: 10,
-    });
-
-    res.json(jobs);
-});
-
-// endpoint to test when the cron job was last run
-app.get("/last-cron-run", (req, res) => {
-    try {
-        const data = fs.readFileSync("/tmp/last-cron-run.txt", "utf8");
-        res.json({ lastCronRun: data });
-    } catch {
-        res.json({ lastCronRun: null });
     }
 });
