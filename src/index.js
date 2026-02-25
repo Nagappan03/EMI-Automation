@@ -58,7 +58,7 @@ cron.schedule("30 20 * * *", async () => {
 });
 
 // Cron for monthly notification (runs daily at 9 AM)
-cron.schedule("* * * * *", async () => {
+cron.schedule("30 3 * * *", async () => {
     console.log("[CRON] Monthly notification check");
     await runMonthlyNotification();
 });
