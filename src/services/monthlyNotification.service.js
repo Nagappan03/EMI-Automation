@@ -6,7 +6,7 @@ import { sendWhatsAppMessage } from "./whatsapp.service.js";
 export async function runMonthlyNotification({ force = false } = {}) {
     const now = new Date();
 
-    if (!force && !isLastDayOfMonth(now)) {
+    if (!force) {
         console.log("[MONTHLY] Not last day. Skipping.");
         return;
     }
