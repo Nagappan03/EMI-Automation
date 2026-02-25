@@ -5,6 +5,7 @@ import fs from "fs";
 import path from "path";
 import { runStatementJob } from "./jobs/statement.job.js";
 import prisma from "./lib/prisma.js";
+import { runMonthlyNotification } from "./services/monthlyNotification.service.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -42,7 +43,7 @@ app.get("/health", async (req, res) => {
     });
 });
 
-// Cron placeholder (runs daily at 2 AM)
+// Cron for statement job (runs daily at 2 AM)
 cron.schedule("30 20 * * *", async () => {
     try {
         const now = new Date().toISOString();
@@ -54,6 +55,12 @@ cron.schedule("30 20 * * *", async () => {
     } catch (err) {
         console.error("[CRON ERROR]", err);
     }
+});
+
+// Cron for monthly notification (runs daily at 9 AM)
+cron.schedule("30 3 * * *", async () => {
+    console.log("[CRON] Monthly notification check");
+    await runMonthlyNotification();
 });
 
 app.listen(PORT, () => {
@@ -133,21 +140,15 @@ app.get("/system-summary", async (req, res) => {
     });
 });
 
-// TEMPORARY — remove after first successful live run
-app.get("/test-full-run", async (req, res) => {
+app.post("/test-monthly", async (req, res) => {
     try {
-        console.log("[TEST] Manual full run triggered");
+        console.log("[TEST] Manual monthly notification triggered");
 
-        await runStatementJob();
+        await runMonthlyNotification({ force: true });
 
-        res.json({
-            status: "SUCCESS",
-            mode: process.env.DRY_RUN === "true" ? "DRY_RUN" : "LIVE_RUN"
-        });
+        res.json({ status: "SUCCESS" });
     } catch (err) {
-        console.error("[TEST FULL RUN ERROR]", err);
-        res.status(500).json({
-            error: err.message
-        });
+        console.error("[TEST MONTHLY ERROR]", err);
+        res.status(500).json({ error: err.message });
     }
 });

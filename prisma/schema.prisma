@@ -24,3 +24,11 @@ model ProcessedStatement {
   statementKey String   @unique
   processedAt  DateTime @default(now())
 }
+
+model MonthlyNotification {
+  id        String   @id @default(cuid())
+  month     Int
+  year      Int
+  sentAt    DateTime @default(now())
+  type      String   // EMAIL or WHATSAPP
+}
