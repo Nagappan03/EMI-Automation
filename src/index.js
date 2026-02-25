@@ -120,10 +120,16 @@ app.get("/system-summary", async (req, res) => {
         orderBy: { startedAt: "desc" }
     });
 
+    const running = await prisma.jobRun.findFirst({
+        where: { status: "RUNNING" },
+        orderBy: { startedAt: "desc" }
+    });
+
     res.json({
         totalRuns,
         lastSuccess,
-        lastFailure
+        lastFailure,
+        running
     });
 });
 
