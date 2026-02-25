@@ -75,7 +75,7 @@ export async function sendMonthlyEmail() {
         // Later: add more here
     ];
 
-    const subject = `EMI Tracker Update – ${monthName} ${year}`;
+    const subject = `EMI Tracker Update Notification for ${monthName} ${year}`;
 
     const body = `
 Hey,
@@ -86,7 +86,7 @@ You can view it here:
 https://docs.google.com/spreadsheets/d/1yYSilofr_Cglmh2fmgaVO3WCeQddy1lRsE9qxVBJ_dw/edit
 
 Regards,
-EMI Tracker
+Nagappan S
 `;
 
     const message = [
