@@ -152,3 +152,17 @@ app.post("/test-monthly", async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+app.post("/test-whatsapp", async (req, res) => {
+    try {
+        await sendWhatsAppMessage({
+            to: "+916369837476",
+            body: "EMI Tracker test message from Railway"
+        });
+
+        res.json({ status: "SUCCESS" });
+    } catch (err) {
+        console.error("[WHATSAPP ERROR]", err);
+        res.status(500).json({ error: err.message });
+    }
+});
