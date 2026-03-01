@@ -27,8 +27,13 @@ model ProcessedStatement {
 
 model MonthlyNotification {
   id        String   @id @default(cuid())
+  startedAt    DateTime @default(now())
+  completedAt  DateTime?
   month     Int
   year      Int
-  sentAt    DateTime @default(now())
+  status    String   @default("PENDING") // SUCCESS | FAILED | RUNNING
+  triggeredBy  String   @default("CRON")
   type      String   // EMAIL or WHATSAPP
+  sentAt    DateTime @default(now())
+  errorMessage String?
 }

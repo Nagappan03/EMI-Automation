@@ -60,8 +60,10 @@ ${errorMessage || "Unknown error"}
 
 export async function sendMonthlyEmail() {
     const now = new Date();
-    const monthName = now.toLocaleString("en-IN", { month: "long" });
-    const year = now.getFullYear();
+    // Report the *next* month (the month the tracker update covers)
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const monthName = nextMonth.toLocaleString("en-IN", { month: "long" });
+    const year = nextMonth.getFullYear();
 
     const oauth2Client = getOAuthClient();
     oauth2Client.setCredentials({
@@ -70,10 +72,17 @@ export async function sendMonthlyEmail() {
 
     const gmail = google.gmail({ version: "v1", auth: oauth2Client });
 
-    const recipients = [
-        "nagappans22@gmail.com"
-        // Later: add more here
-    ];
+    const recipientsRaw = process.env.EMAIL_RECIPIENTS;
+
+    if (!recipientsRaw) {
+        console.log("[MONTHLY EMAIL] No recipients configured. Skipping.");
+        return false;
+    }
+
+    const recipients = recipientsRaw
+        .split(",")
+        .map(r => r.trim())
+        .filter(Boolean);
 
     const subject = `EMI Tracker Update Notification for ${monthName} ${year}`;
 
@@ -83,33 +92,47 @@ Hey,
 The Credit Card EMI Tracker has been updated for ${monthName} ${year}.
 
 You can view it here:
-https://docs.google.com/spreadsheets/d/1yYSilofr_Cglmh2fmgaVO3WCeQddy1lRsE9qxVBJ_dw/edit
+${process.env.GOOGLE_SHEET_LINK}
 
 Regards,
 Nagappan S
 `;
 
-    const message = [
-        `From: "EMI Tracker" <${process.env.ALERT_EMAIL_FROM}>`,
-        `To: ${recipients.join(", ")}`,
-        `Subject: ${subject}`,
-        "Content-Type: text/plain; charset=utf-8",
-        "",
-        body
-    ].join("\n");
+    let successCount = 0;
 
-    const encodedMessage = Buffer.from(message)
-        .toString("base64")
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_")
-        .replace(/=+$/, "");
+    for (const to of recipients) {
+        try {
+            const message = [
+                `From: "EMI Tracker Automation Engine" <${process.env.ALERT_EMAIL_FROM}>`,
+                `To: ${to}`,
+                `Subject: ${subject}`,
+                "Content-Type: text/plain; charset=utf-8",
+                "",
+                body
+            ].join("\n");
 
-    await gmail.users.messages.send({
-        userId: "me",
-        requestBody: {
-            raw: encodedMessage
+            const encodedMessage = Buffer.from(message)
+                .toString("base64")
+                .replace(/\+/g, "-")
+                .replace(/\//g, "_")
+                .replace(/=+$/, "");
+
+            await gmail.users.messages.send({
+                userId: "me",
+                requestBody: {
+                    raw: encodedMessage
+                }
+            });
+
+            console.log(`[MONTHLY EMAIL] Sent to ${to}`);
+            successCount++;
+
+        } catch (err) {
+            console.error(`[MONTHLY EMAIL ERROR] Failed for ${to}:`, err.message);
         }
-    });
+    }
 
-    console.log("[MONTHLY] Email notification sent successfully");
+    console.log(`[MONTHLY EMAIL] ${successCount}/${recipients.length} sent`);
+
+    return successCount > 0;
 }

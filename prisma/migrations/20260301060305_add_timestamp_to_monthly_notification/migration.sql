@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "MonthlyNotification" ADD COLUMN     "completedAt" TIMESTAMP(3),
+ADD COLUMN     "startedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;

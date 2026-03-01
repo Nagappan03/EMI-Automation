@@ -6,10 +6,17 @@ import path from "path";
 import { runStatementJob } from "./jobs/statement.job.js";
 import prisma from "./lib/prisma.js";
 import { runMonthlyNotification } from "./services/monthlyNotification.service.js";
-import { sendWhatsAppMessage } from "./services/whatsapp.service.js";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
+
+// Serve frontend static files
+const publicPath = path.join(__dirname, "../public");
+app.use(express.static(publicPath));
 
 const saJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
 
@@ -28,6 +35,16 @@ if (!fs.existsSync(saPath)) {
 process.env.GOOGLE_APPLICATION_CREDENTIALS = saPath;
 
 console.log("Google credentials written to:", saPath);
+
+function requireAdmin(req, res, next) {
+    const password = req.headers["x-admin-password"];
+
+    if (!password || password !== process.env.ADMIN_PASSWORD) {
+        return res.status(403).json({ error: "Unauthorized" });
+    }
+
+    next();
+}
 
 // Health check
 app.get("/health", async (req, res) => {
@@ -78,17 +95,24 @@ app.listen(PORT, () => {
     }
 })();
 
+// admin password check
+app.post("/api/admin/verify", requireAdmin, (req, res) => {
+    res.json({ status: "OK" });
+});
+
 // Get all runs
-app.get("/runs", async (req, res) => {
+app.get("/api/runs", async (req, res) => {
     const runs = await prisma.jobRun.findMany({
         orderBy: { startedAt: "desc" },
-        take: 20
+        take: 50
     });
 
     const formatted = runs.map(run => ({
         ...run,
         durationSeconds: run.completedAt
-            ? Math.round((run.completedAt - run.startedAt) / 1000)
+            ? Math.round(
+                (new Date(run.completedAt) - new Date(run.startedAt)) / 1000
+            )
             : null
     }));
 
@@ -96,7 +120,7 @@ app.get("/runs", async (req, res) => {
 });
 
 // Get a specific run with id
-app.get("/runs/:id", async (req, res) => {
+app.get("/api/runs/:id", async (req, res) => {
     const run = await prisma.jobRun.findUnique({
         where: { id: req.params.id }
     });
@@ -105,7 +129,7 @@ app.get("/runs/:id", async (req, res) => {
 });
 
 // Manual run
-app.post("/run-now", async (req, res) => {
+app.post("/api/run-now", requireAdmin, async (req, res) => {
     try {
         const result = await runStatementJob("MANUAL");
         res.json({ status: result });
@@ -114,9 +138,30 @@ app.post("/run-now", async (req, res) => {
     }
 });
 
+app.post("/api/test-monthly-notifications", requireAdmin, async (req, res) => {
+    try {
+        console.log("[TEST] Manual monthly notification triggered");
+
+        await runMonthlyNotification({ force: true }, "MANUAL");
+
+        res.json({ status: "SUCCESS" });
+    } catch (err) {
+        console.error("[TEST MONTHLY ERROR]", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Get system summary
-app.get("/system-summary", async (req, res) => {
+app.get("/api/system-summary", async (req, res) => {
     const totalRuns = await prisma.jobRun.count();
+
+    const emailEnabled = true;
+
+    const whatsappEnabled = false;
+
+    const lastRun = await prisma.jobRun.findFirst({
+        orderBy: { startedAt: "desc" }
+    });
 
     const lastSuccess = await prisma.jobRun.findFirst({
         where: { status: "SUCCESS" },
@@ -133,37 +178,87 @@ app.get("/system-summary", async (req, res) => {
         orderBy: { startedAt: "desc" }
     });
 
+    let overallStatus = "UNKNOWN";
+
+    if (running) {
+        overallStatus = "RUNNING";
+    } else if (lastRun?.status === "FAILED") {
+        overallStatus = "FAILED";
+    } else if (lastRun?.status === "SUCCESS") {
+        overallStatus = "SUCCESS";
+    }
+
+    // -------- Monthly Notification Logic --------
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const year = now.getFullYear();
+
+    const monthly = await prisma.monthlyNotification.findFirst({
+        where: { month, year, type: "EMAIL" },
+        orderBy: { startedAt: "desc" }
+    });
+
+    let monthlyStatus = "PENDING";
+
+    if (monthly?.status === "SUCCESS") {
+        monthlyStatus = "SUCCESS";
+    } else if (monthly?.status === "FAILED") {
+        monthlyStatus = "FAILED";
+    } else if (monthly?.status === "RUNNING") {
+        monthlyStatus = "RUNNING";
+    }
+
     res.json({
         totalRuns,
+        overallStatus,
+        lastRun,
         lastSuccess,
         lastFailure,
-        running
+        running,
+        monthlyNotificationStatus: monthlyStatus,
+        axisStatus: lastRun?.axisStatus || "UNKNOWN",
+        kotakStatus: lastRun?.kotakStatus || "UNKNOWN",
+        lastRunTime: lastRun?.startedAt || null,
+        emailEnabled,
+        whatsappEnabled
     });
 });
 
-app.post("/test-monthly", async (req, res) => {
-    try {
-        console.log("[TEST] Manual monthly notification triggered");
+app.get("/api/system-details", async (req, res) => {
+    const uptimeSeconds = process.uptime();
 
-        await runMonthlyNotification({ force: true });
+    const dbConnected = await prisma.$queryRaw`SELECT 1`
+        .then(() => true)
+        .catch(() => false);
 
-        res.json({ status: "SUCCESS" });
-    } catch (err) {
-        console.error("[TEST MONTHLY ERROR]", err);
-        res.status(500).json({ error: err.message });
-    }
+    res.json({
+        api: {
+            status: "ONLINE",
+            uptimeSeconds
+        },
+
+        database: {
+            connected: dbConnected
+        },
+
+        notifications: {
+            emailEnabled: !!process.env.EMAIL_RECIPIENTS,
+            whatsappEnabled: !!process.env.TWILIO_WHATSAPP_TEMPLATE_SID,
+            whatsappRecipients: process.env.WHATSAPP_RECIPIENTS
+                ? process.env.WHATSAPP_RECIPIENTS.split(",").length
+                : 0
+        },
+
+        system: {
+            nodeVersion: process.version,
+            environment: process.env.NODE_ENV,
+            memoryUsageMB: Math.round(process.memoryUsage().rss / 1024 / 1024),
+            serverTime: new Date()
+        }
+    });
 });
 
-app.post("/test-whatsapp", async (req, res) => {
-    try {
-        await sendWhatsAppMessage({
-            to: "+916369837476",
-            body: "EMI Tracker test message from Railway"
-        });
-
-        res.json({ status: "SUCCESS" });
-    } catch (err) {
-        console.error("[WHATSAPP ERROR]", err);
-        res.status(500).json({ error: err.message });
-    }
+// Catch-all for React Router
+app.use((req, res) => {
+    res.sendFile(path.join(__dirname, "../public", "index.html"));
 });
