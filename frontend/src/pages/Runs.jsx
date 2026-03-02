@@ -12,7 +12,11 @@ function StatusBadge({ status }) {
   };
 
   return (
-    <span className={`px-3 py-1 text-xs rounded-full ${styles[status] || "bg-slate-600/20 text-slate-400"}`}>
+    <span
+      className={`px-3 py-1 text-xs rounded-full whitespace-nowrap ${
+        styles[status] || "bg-slate-600/20 text-slate-400"
+      }`}
+    >
       {status}
     </span>
   );
@@ -56,23 +60,19 @@ function Runs() {
   };
 
   const formatDuration = (seconds) => {
+    if (seconds === null || seconds === undefined) return "—";
     if (seconds < 60) return `${seconds}s`;
-
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-
     return `${mins}m ${secs}s`;
   };
 
   const filteredRuns =
-    filter === "ALL"
-      ? runs
-      : runs.filter((r) => r.status === filter);
+    filter === "ALL" ? runs : runs.filter((r) => r.status === filter);
 
   if (loading) return <Loader fullScreen />;
 
   const totalPages = Math.ceil(filteredRuns.length / itemsPerPage);
-
   const paginatedRuns = filteredRuns.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
@@ -80,7 +80,8 @@ function Runs() {
 
   return (
     <div className="space-y-10 animate-fade-in">
-      <div className="flex justify-between items-center">
+      {/* Header */}
+      <div className="space-y-6">
         <div>
           <h2 className="text-3xl font-semibold">Job Runs</h2>
           <p className="text-slate-400 text-sm mt-1">
@@ -88,7 +89,8 @@ function Runs() {
           </p>
         </div>
 
-        <div className="flex gap-2">
+        {/* Responsive Filters */}
+        <div className="flex gap-3 overflow-x-auto pb-2">
           {["ALL", "SUCCESS", "FAILED", "RUNNING"].map((type) => (
             <button
               key={type}
@@ -96,10 +98,10 @@ function Runs() {
                 setFilter(type);
                 setCurrentPage(1);
               }}
-              className={`px-4 py-2 rounded-lg text-sm ${
+              className={`whitespace-nowrap px-4 py-2 rounded-lg text-sm transition ${
                 filter === type
-                  ? "bg-indigo-600 cursor-pointer"
-                  : "bg-slate-800 border border-slate-700 cursor-pointer"
+                  ? "bg-indigo-600"
+                  : "bg-slate-800 border border-slate-700"
               }`}
             >
               {type}
@@ -108,50 +110,48 @@ function Runs() {
         </div>
       </div>
 
-      <div className="bg-slate-800/60 border border-slate-700 rounded-xl overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-slate-900/50 text-slate-400 text-sm">
-            <tr>
-              <th className="p-4">Status</th>
-              <th>Started</th>
-              <th>Duration</th>
-              <th>Triggered</th>
-              <th></th>
-            </tr>
-          </thead>
-
-          <tbody className="text-sm">
-            {filteredRuns.length === 0 && (
+      {/* Responsive Table Wrapper */}
+      <div className="bg-slate-800/60 border border-slate-700 rounded-xl">
+        <div className="overflow-x-auto">
+          <table className="min-w-[650px] w-full text-left">
+            <thead className="bg-slate-900/50 text-slate-400 text-sm">
               <tr>
-                <td colSpan="8" className="text-center py-12 text-slate-400">
-                  No {filter === "ALL" ? "" : filter.toLowerCase()} jobs found.
-                </td>
+                <th className="p-4">Status</th>
+                <th>Started</th>
+                <th>Duration</th>
+                <th>Triggered</th>
+                <th></th>
               </tr>
-            )}
-            {paginatedRuns.map((run) => (
-              <>
+            </thead>
+
+            <tbody className="text-sm">
+              {filteredRuns.length === 0 && (
+                <tr>
+                  <td
+                    colSpan="5"
+                    className="text-center py-12 text-slate-400"
+                  >
+                    No {filter === "ALL" ? "" : filter.toLowerCase()} jobs found.
+                  </td>
+                </tr>
+              )}
+
+              {paginatedRuns.map((run) => (
                 <tr
                   key={run.id}
-                  className="border-t border-slate-700 hover:bg-slate-900/40 transition-all duration-200"
+                  className="border-t border-slate-700 hover:bg-slate-900/40 transition"
                 >
                   <td className="p-4">
                     <StatusBadge status={run.status} />
                   </td>
                   <td>{formatDate(run.startedAt)}</td>
-                  <td>
-                    {run.durationSeconds !== null
-                      ? formatDuration(run.durationSeconds)
-                      : "—"}
-                  </td>
+                  <td>{formatDuration(run.durationSeconds)}</td>
                   <td>{run.triggeredBy}</td>
                   <td>
                     <button
                       onClick={() => setSelectedRun(run)}
-                      className="text-indigo-400 hover:underline flex items-center gap-2 cursor-pointer"
+                      className="text-indigo-400 hover:underline cursor-pointer whitespace-nowrap"
                     >
-                      {run.status === "FAILED" && (
-                        <span className="text-red-400">⚠</span>
-                      )}
                       {run.status === "FAILED"
                         ? "Inspect"
                         : run.status === "RUNNING"
@@ -160,13 +160,15 @@ function Runs() {
                     </button>
                   </td>
                 </tr>
-              </>
-            ))}
-          </tbody>
-        </table>  
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
-      <div className="flex justify-between items-center mt-6">
-        <span className="text-sm text-slate-400">
+
+      {/* Pagination */}
+      <div className="flex justify-between items-center mt-6 text-sm">
+        <span className="text-slate-400">
           Page {currentPage} of {totalPages || 1}
         </span>
 
@@ -188,6 +190,7 @@ function Runs() {
           </button>
         </div>
       </div>
+
       {selectedRun && (
         <RunDetailsModal
           run={selectedRun}
