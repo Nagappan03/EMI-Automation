@@ -44,16 +44,16 @@ export async function runMonthlyNotification({ force = false } = {}, triggeredBy
         // 1️⃣ Email (mandatory)
         await sendMonthlyEmail();
 
-        // 2️⃣ WhatsApp (optional)
-        // const whatsappSent = await sendMonthlyWhatsApp({
-        //     month: nextMonth,
-        //     year: nextYear,
-        //     sheetLink
-        // });
+        // 2️⃣ WhatsApp(optional)
+        const whatsappSent = await sendMonthlyWhatsApp({
+            month: nextMonth,
+            year: nextYear,
+            sheetLink
+        });
 
-        // if (!whatsappSent) {
-        //     console.log("[MONTHLY] WhatsApp failed but email succeeded.");
-        // }
+        if (!whatsappSent) {
+            console.log("[MONTHLY] WhatsApp failed but email succeeded.");
+        }
 
         const completedAt = new Date();
 
