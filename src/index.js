@@ -157,7 +157,7 @@ app.get("/api/system-summary", async (req, res) => {
 
     const emailEnabled = true;
 
-    const whatsappEnabled = false;
+    const whatsappEnabled = process.env.WHATSAPP_ENABLED === "true";
 
     const lastRun = await prisma.jobRun.findFirst({
         orderBy: { startedAt: "desc" }
@@ -243,7 +243,7 @@ app.get("/api/system-details", async (req, res) => {
 
         notifications: {
             emailEnabled: !!process.env.EMAIL_RECIPIENTS,
-            whatsappEnabled: !!process.env.TWILIO_WHATSAPP_TEMPLATE_SID,
+            whatsappEnabled: process.env.WHATSAPP_ENABLED === "true",
             whatsappRecipients: process.env.WHATSAPP_RECIPIENTS
                 ? process.env.WHATSAPP_RECIPIENTS.split(",").length
                 : 0
