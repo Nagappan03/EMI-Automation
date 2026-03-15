@@ -1,20 +1,26 @@
-import { fetchAxisStatement } from "../services/gmail.service.js";
-import { decryptAndExtractText } from "../services/pdf.service.js";
+import { fetchAxisStatement } from "../services/gmail.service.js"
 import { updateAxisTracker } from "../services/sheets.service.js";
 import { extractAxisInstallmentInfo } from "../utils/axis.utils.js";
-import { withRetry } from "../utils/retry.utils.js";
 
 import { fetchKotakStatement } from "../services/gmail.service.js";
+import { updateKotakTracker } from "../services/sheets.service.js";
 import {
     extractKotakAmount,
     extractKotakInstallmentInfo,
     extractKotakMonthYear
 } from "../utils/kotak.utils.js";
-import { updateKotakTracker } from "../services/sheets.service.js";
 
+import { fetchHsbcStatement } from "../services/gmail.service.js";
+import { updateHsbcTracker } from "../services/sheets.service.js";
+import {
+    extractHsbcInstallmentInfo,
+    extractHsbcEmiAmount
+} from "../utils/hsbc.utils.js";
+
+import { withRetry } from "../utils/retry.utils.js";
+import { decryptAndExtractText } from "../services/pdf.service.js";
 import { getNextMonthYear } from "../utils/date.utils.js";
 import { sendFailureAlertEmail } from "../services/email.service.js";
-
 import prisma from "../lib/prisma.js";
 
 /**
@@ -42,6 +48,7 @@ export async function runStatementJob(triggeredBy = "CRON") {
 
     let axisStatus = "SKIPPED";
     let kotakStatus = "SKIPPED";
+    let hsbcStatus = "SKIPPED";
     let overallStatus = "SUCCESS";
     let errorMessage = null;
 
@@ -65,6 +72,16 @@ export async function runStatementJob(triggeredBy = "CRON") {
             : `Kotak: ${err.message}`;
     }
 
+    try {
+        hsbcStatus = await processHsbcStatement();
+    } catch (err) {
+        hsbcStatus = "FAILED";
+        overallStatus = "FAILED";
+        errorMessage = errorMessage
+            ? errorMessage + ` | HSBC: ${err.message}`
+            : `HSBC: ${err.message}`;
+    }
+
     const completedAt = new Date();
 
     await prisma.jobRun.update({
@@ -73,6 +90,7 @@ export async function runStatementJob(triggeredBy = "CRON") {
             status: overallStatus,
             axisStatus,
             kotakStatus,
+            hsbcStatus,
             errorMessage,
             completedAt
         }
@@ -82,6 +100,7 @@ export async function runStatementJob(triggeredBy = "CRON") {
         await sendFailureAlertEmail({
             axisStatus,
             kotakStatus,
+            hsbcStatus,
             errorMessage,
             triggeredBy
         });
@@ -216,6 +235,8 @@ async function processKotakStatement() {
 
     const amount = extractKotakAmount(statementText);
 
+    console.log("[KOTAK] Total EMI amount calculated:", amount);
+
     const { currentInstallment, totalInstallments } =
         extractKotakInstallmentInfo(statementText);
 
@@ -241,6 +262,80 @@ async function processKotakStatement() {
     });
 
     console.log('[KOTAK] Successfully processed statement');
+
+    return "SUCCESS";
+}
+
+/**
+ * Process HSBC Bank credit card statement
+ */
+async function processHsbcStatement() {
+
+    console.log("[HSBC] Processing HSBC Bank statement");
+
+    const hsbcData = await withRetry(
+        () => fetchHsbcStatement(),
+        { label: "Fetch HSBC statement" }
+    );
+
+    if (!hsbcData) {
+        console.log("[HSBC] No statement found");
+        return "SKIPPED";
+    }
+
+    const { statementKey, pdfPath } = hsbcData;
+
+    const alreadyProcessed = await prisma.processedStatement.findUnique({
+        where: { statementKey }
+    });
+
+    if (alreadyProcessed) {
+        console.log("[HSBC] Already processed");
+        return "SKIPPED";
+    }
+
+    console.log(`[HSBC] New statement detected: ${statementKey}`);
+
+    const statementText = await withRetry(
+        () => decryptAndExtractText({
+            filePath: pdfPath,
+            password: process.env.HSBC_PDF_PASSWORD,
+            bank: "HSBC"
+        }),
+        { label: "Decrypt HSBC PDF" }
+    );
+
+    const { currentInstallment, totalInstallments } =
+        extractHsbcInstallmentInfo(statementText);
+
+    const amount = extractHsbcEmiAmount(statementText);
+
+    const now = new Date();
+    const { month: nextMonth, year: nextYear } =
+        getNextMonthYear(
+            now.toLocaleString("en-IN", { month: "short" }),
+            now.getFullYear()
+        );
+
+    await withRetry(
+        () => updateHsbcTracker({
+            amount,
+            month: nextMonth,
+            year: nextYear,
+            currentInstallment,
+            totalInstallments
+        }),
+        { label: "Update HSBC tracker" }
+    );
+
+    await prisma.processedStatement.create({
+        data: {
+            bank: "HSBC",
+            statementKey
+        }
+    });
+
+    console.log("[HSBC] Successfully processed statement");
 
     return "SUCCESS";
 }

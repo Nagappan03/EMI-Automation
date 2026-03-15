@@ -4,6 +4,7 @@ import { getOAuthClient } from "./gmail.auth.js";
 export async function sendFailureAlertEmail({
     axisStatus,
     kotakStatus,
+    hsbcStatus,
     errorMessage,
     triggeredBy
 }) {
@@ -25,6 +26,7 @@ Time: ${new Date().toISOString()}
 
 Axis Status: ${axisStatus}
 Kotak Status: ${kotakStatus}
+HSBC Status: ${hsbcStatus}
 
 Error:
 ${errorMessage || "Unknown error"}

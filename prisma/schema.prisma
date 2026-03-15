@@ -15,6 +15,7 @@ model JobRun {
   triggeredBy  String   @default("CRON")
   axisStatus   String?
   kotakStatus  String?
+  hsbcStatus   String?
   errorMessage String?
 }
 

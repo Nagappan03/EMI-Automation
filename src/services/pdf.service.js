@@ -15,13 +15,37 @@ export async function decryptAndExtractText({
     const decryptedPath = path.join("/tmp", `${bank}-decrypted.pdf`);
 
     // 1️⃣ Decrypt using qpdf
+    let decryptedSuccessfully = false;
+
+    const originalWarn = console.warn;
+
+    console.warn = (...args) => {
+        const msg = args.join(" ");
+
+        if (
+            msg.includes("Font") ||
+            msg.includes("standardFontDataUrl") ||
+            msg.includes("fallback to a default font")
+        ) {
+            return; // suppress pdfjs font warnings
+        }
+
+        originalWarn(...args);
+    };
+
     try {
         execSync(
-            `qpdf --password=${password} --decrypt "${filePath}" "${decryptedPath}"`,
-            { stdio: "ignore" }
+            `qpdf --password="${password}" --decrypt "${filePath}" "${decryptedPath}"`,
+            { stdio: "pipe" }   // capture output instead of throwing
         );
-    } catch {
-        throw new Error(`[${bank}] PDF decryption failed (qpdf)`);
+        decryptedSuccessfully = true;
+    } catch (err) {
+        // If qpdf produced a decrypted file despite warnings, accept it
+        if (fs.existsSync(decryptedPath)) {
+            decryptedSuccessfully = true;
+        } else {
+            throw new Error(`[${bank}] PDF decryption failed (qpdf)`);
+        }
     }
 
     const decryptedBytes = new Uint8Array(
@@ -46,7 +70,9 @@ export async function decryptAndExtractText({
         fs.unlinkSync(decryptedPath);
     }
 
-    return normalizeText(extractedText);
+    const finalText = normalizeText(extractedText);
+
+    return finalText;
 }
 
 function normalizeText(text) {

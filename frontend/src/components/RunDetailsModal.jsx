@@ -122,6 +122,11 @@ function RunDetailsModal({ run, onClose }) {
               <span className="text-slate-400">Kotak Status</span>
               <StatusBadge status={run.kotakStatus} />
             </div>
+
+            <div className="flex justify-between border-b border-slate-800 pb-2">
+              <span className="text-slate-400">HSBC Status</span>
+              <StatusBadge status={run.hsbcStatus} />
+            </div>
           </div>
 
           {run.errorMessage && (

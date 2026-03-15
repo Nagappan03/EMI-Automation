@@ -218,6 +218,7 @@ app.get("/api/system-summary", async (req, res) => {
         monthlyNotificationStatus: monthlyStatus,
         axisStatus: lastRun?.axisStatus || "UNKNOWN",
         kotakStatus: lastRun?.kotakStatus || "UNKNOWN",
+        hsbcStatus: lastRun?.hsbcStatus || "UNKNOWN",
         lastRunTime: lastRun?.startedAt || null,
         emailEnabled,
         whatsappEnabled

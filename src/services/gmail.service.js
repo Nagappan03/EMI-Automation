@@ -172,3 +172,83 @@ export async function fetchKotakStatement() {
         pdfPath: filePath
     };
 }
+
+export async function fetchHsbcStatement() {
+
+    const oauth2Client = getOAuthClient();
+    oauth2Client.setCredentials({
+        refresh_token: process.env.GMAIL_REFRESH_TOKEN
+    });
+
+    const gmail = google.gmail({ version: "v1", auth: oauth2Client });
+
+    const query =
+        'from:"creditcardstatement" subject:"HSBC Credit Card statement" has:attachment';
+
+    const res = await gmail.users.messages.list({
+        userId: "me",
+        q: query,
+        maxResults: 20
+    });
+
+    if (!res.data.messages?.length) return null;
+
+    let latest = null;
+
+    for (const m of res.data.messages) {
+
+        const msg = await gmail.users.messages.get({
+            userId: "me",
+            id: m.id
+        });
+
+        const parts = msg.data.payload.parts || [];
+
+        // console.log("[HSBC DEBUG] Attachments found in email:");
+
+        // parts.forEach(p => {
+        //     console.log(" -", p.filename);
+        // });
+
+        const attachmentPart = parts.find(
+            p => /^\d{8}\.pdf$/.test(p.filename)
+        );
+
+        // if (attachmentPart) {
+        //     console.log("[HSBC DEBUG] Selected attachment:", attachmentPart.filename);
+        // } else {
+        //     console.log("[HSBC DEBUG] No attachment matched regex");
+        // }
+
+        if (!attachmentPart) continue;
+
+        const internalTimestamp = Number(msg.data.internalDate);
+
+        if (!latest || internalTimestamp > latest.internalTimestamp) {
+            latest = {
+                id: m.id,
+                msg,
+                attachmentPart,
+                internalTimestamp
+            };
+        }
+    }
+
+    if (!latest) return null;
+
+    const att = await gmail.users.messages.attachments.get({
+        userId: "me",
+        messageId: latest.id,
+        id: latest.attachmentPart.body.attachmentId
+    });
+
+    const buffer = Buffer.from(att.data.data, "base64");
+
+    const filePath = path.join("/tmp", "hsbc-statement.pdf");
+    fs.writeFileSync(filePath, buffer);
+
+    return {
+        statementKey: latest.id,
+        pdfPath: filePath
+    };
+}

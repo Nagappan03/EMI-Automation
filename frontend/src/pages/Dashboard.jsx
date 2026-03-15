@@ -217,6 +217,12 @@ function Dashboard() {
         />
 
         <StatCard
+          title="HSBC Bank (Last Job Run Status)"
+          value={formatStatus(summary.hsbcStatus)}
+          status={summary.hsbcStatus}
+        />
+
+        <StatCard
           title="Other Banks"
           value={"Under Construction"}
           status={"COMING SOON"}
