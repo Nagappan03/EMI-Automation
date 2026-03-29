@@ -305,10 +305,13 @@ async function processHsbcStatement() {
         { label: "Decrypt HSBC PDF" }
     );
 
-    const { currentInstallment, totalInstallments } =
-        extractHsbcInstallmentInfo(statementText);
+    const {
+        ref,
+        currentInstallment,
+        totalInstallments
+    } = extractHsbcInstallmentInfo(statementText);
 
-    const amount = extractHsbcEmiAmount(statementText);
+    const { total: amount } = extractHsbcEmiAmount(statementText, ref);
 
     const now = new Date();
     const { month: nextMonth, year: nextYear } =

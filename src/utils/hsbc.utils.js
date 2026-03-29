@@ -1,48 +1,107 @@
-export function extractHsbcInstallmentInfo(text) {
+/**
+ * Extract HSBC installment info (dynamic, merchant-based)
+ */
+export function extractHsbcInstallmentInfo(text, merchantName = "FORERUN SYSTEMS") {
 
-    const ref = "CC26047002764";
+    const chunks = text.split(/(?=\d{2}[A-Z]{3})/g);
 
-    const regex = new RegExp(
-        `${ref}.*?(\\d+)(?:ST|ND|RD|TH) OF (\\d+) INSTALLMENTS`,
-        "i"
-    );
+    let ref = null;
+    let currentInstallment = null;
+    let totalInstallments = null;
 
-    const match = text.match(regex);
+    for (const chunk of chunks) {
 
-    if (!match) {
-        throw new Error("[HSBC] Installment info not found for reference " + ref);
+        if (
+            chunk.toUpperCase().includes(merchantName.toUpperCase()) &&
+            chunk.includes("INSTALLMENTS")
+        ) {
+
+            // Extract REF
+            const refMatch = chunk.match(/CC\d{11}/);
+            if (refMatch) {
+                ref = refMatch[0];
+            }
+
+            // Extract installment info
+            const instMatch = chunk.match(/(\d+)(?:ST|ND|RD|TH) OF (\d+) INSTALLMENTS/i);
+
+            if (instMatch) {
+                currentInstallment = Number(instMatch[1]);
+                totalInstallments = Number(instMatch[2]);
+            }
+
+            // Stop once found valid data
+            if (ref && currentInstallment && totalInstallments) {
+                break;
+            }
+        }
     }
 
+    if (!ref || !currentInstallment || !totalInstallments) {
+        throw new Error("[HSBC] Installment info not found");
+    }
+
+    console.log(`[HSBC] Extracted REF: ${ref}`);
+    console.log(`[HSBC] Installment: ${currentInstallment}/${totalInstallments}`);
+
     return {
-        currentInstallment: Number(match[1]),
-        totalInstallments: Number(match[2])
+        ref,
+        currentInstallment,
+        totalInstallments
     };
 }
 
+/**
+ * Extract HSBC EMI amount (principal + interest + GST)
+ */
+export function extractHsbcEmiAmount(text, ref, merchantName = "FORERUN SYSTEMS") {
 
-export function extractHsbcEmiAmount(text) {
+    const chunks = text.split(/(?=\d{2}[A-Z]{3})/g);
 
-    const ref = "CC26047002764";
+    let principal = null;
+    let interest = null;
+    let gst = null;
 
-    const principalMatch = text.match(
-        new RegExp(`${ref}\\s+([\\d,]+\\.\\d{2})(?!\\s+CR)\\s+\\d+(?:ST|ND|RD|TH) OF \\d+ INSTALLMENTS PRINCIPAL`, "i")
-    );
+    for (const chunk of chunks) {
 
-    const interestMatch = text.match(
-        new RegExp(`${ref}\\s+([\\d,]+\\.\\d{2})(?!\\s+CR)\\s+\\d+(?:ST|ND|RD|TH) OF \\d+ INSTALLMENTS INTEREST`, "i")
-    );
+        // Only process relevant merchant + ref
+        if (
+            chunk.includes(ref) &&
+            chunk.toUpperCase().includes(merchantName.toUpperCase())
+        ) {
 
-    const gstMatch = text.match(
-        new RegExp(`IGST ASSESSMENT @18\\.00%\\s+${ref}\\s+([\\d,]+\\.\\d{2})(?!\\s+CR)`, "i")
-    );
+            // Skip duplicate CR entries
+            if (chunk.includes(" CR ")) continue;
 
-    if (!principalMatch || !interestMatch || !gstMatch) {
-        throw new Error("[HSBC] EMI components missing");
+            const numbers = chunk.match(/[\d,]+\.\d{2}/g);
+            const amount = numbers?.[0]
+                ? parseFloat(numbers[0].replace(/,/g, ""))
+                : null;
+
+            if (!amount) continue;
+
+            if (/PRINCIPAL/i.test(chunk)) {
+                principal = amount;
+            }
+
+            if (/INTEREST/i.test(chunk)) {
+                interest = amount;
+            }
+        }
     }
 
-    const principal = parseFloat(principalMatch[1].replace(/,/g, ""));
-    const interest = parseFloat(interestMatch[1].replace(/,/g, ""));
-    const gst = parseFloat(gstMatch[1].replace(/,/g, ""));
+    // GST (outside merchant chunks)
+    const gstMatch = text.match(
+        new RegExp(`IGST ASSESSMENT @18\\.00%\\s+${ref}\\s+([\\d,]+\\.\\d{2})`, "i")
+    );
+
+    if (gstMatch) {
+        gst = parseFloat(gstMatch[1].replace(/,/g, ""));
+    }
+
+    if (!principal || !interest || !gst) {
+        throw new Error("[HSBC] EMI components missing");
+    }
 
     const total = Number((principal + interest + gst).toFixed(2));
 
@@ -50,5 +109,10 @@ export function extractHsbcEmiAmount(text) {
         `[HSBC] EMI calculated → Principal: ${principal}, Interest: ${interest}, GST: ${gst}, Total: ${total}`
     );
 
-    return total;
+    return {
+        principal,
+        interest,
+        gst,
+        total
+    };
 }
