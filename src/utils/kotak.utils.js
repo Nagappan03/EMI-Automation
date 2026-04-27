@@ -4,10 +4,10 @@
  * Statement Date 25-Jan-2026
  */
 export function extractKotakMonthYear(text) {
-    const match = text.match(/Statement Date\s+\d{1,2}-(\w{3})-(\d{4})/);
+    const match = text.match(/(?:Statement Date|Billing Date)\s+\d{1,2}-(\w{3})-(\d{4})/);
 
     if (!match) {
-        throw new Error("[Kotak] Unable to extract month/year from Statement Date");
+        throw new Error("[Kotak] Unable to extract month/year from Statement Date or Billing Date");
     }
 
     return {
