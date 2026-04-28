@@ -21,7 +21,7 @@ export function extractKotakMonthYear(text) {
  */
 export function extractKotakAmount(text) {
     const match = text.match(
-        /Total Amount Due\s*\(TAD\)\s*Rs\.\s*([\d,]+\.\d{2})/
+        /Total Amount Due\s*\(TAD\)\s*(?:Rs\.|₹)\s*([\d,]+\.\d{2})/
     );
 
     if (!match) {
