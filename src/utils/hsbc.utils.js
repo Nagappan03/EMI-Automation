@@ -41,9 +41,6 @@ export function extractHsbcInstallmentInfo(text, merchantName = "FORERUN SYSTEMS
         throw new Error("[HSBC] Installment info not found");
     }
 
-    console.log(`[HSBC] Extracted REF: ${ref}`);
-    console.log(`[HSBC] Installment: ${currentInstallment}/${totalInstallments}`);
-
     return {
         ref,
         currentInstallment,

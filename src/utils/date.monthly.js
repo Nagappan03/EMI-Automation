@@ -3,3 +3,7 @@ export function isLastDayOfMonth(date = new Date()) {
     tomorrow.setDate(date.getDate() + 1);
     return tomorrow.getDate() === 1;
 }
+
+export function isFirstDayOfMonth(date = new Date()) {
+    return date.getDate() === 1;
+}

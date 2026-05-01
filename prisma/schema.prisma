@@ -23,6 +23,9 @@ model ProcessedStatement {
   id           String   @id @default(cuid())
   bank         String
   statementKey String   @unique
+  amount               Float?
+  currentInstallment   Int?
+  totalInstallments    Int?
   processedAt  DateTime @default(now())
 }
 

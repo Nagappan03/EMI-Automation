@@ -1,7 +1,6 @@
 import prisma from "../lib/prisma.js";
 import { isLastDayOfMonth } from "../utils/date.monthly.js";
-import { sendMonthlyEmail } from "./email.service.js";
-import { sendMonthlyWhatsApp } from "./whatsapp.service.js";
+import { sendPersonalizedNotificationsFromDB } from "./customNotification.service.js";
 
 export async function runMonthlyNotification({ force = false } = {}, triggeredBy = "CRON") {
     const now = new Date();
@@ -13,13 +12,6 @@ export async function runMonthlyNotification({ force = false } = {}, triggeredBy
 
     const month = now.getMonth() + 1;
     const year = now.getFullYear();
-
-    // Next month/year for notification content (tracker was updated for next month)
-    const nextMonthDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    const nextMonth = nextMonthDate.getMonth() + 1;
-    const nextYear = nextMonthDate.getFullYear();
-
-    const sheetLink = process.env.GOOGLE_SHEET_LINK;
 
     const existing = await prisma.monthlyNotification.findFirst({
         where: { month, year, type: "EMAIL", triggeredBy: "CRON" }
@@ -41,23 +33,7 @@ export async function runMonthlyNotification({ force = false } = {}, triggeredBy
     });
 
     try {
-        // 1️⃣ Email (mandatory)
-        await sendMonthlyEmail();
-
-        // 2️⃣ WhatsApp (optional, controlled by WHATSAPP_ENABLED env)
-        if (process.env.WHATSAPP_ENABLED === "true") {
-            const whatsappSent = await sendMonthlyWhatsApp({
-                month: nextMonth,
-                year: nextYear,
-                sheetLink
-            });
-
-            if (!whatsappSent) {
-                console.log("[MONTHLY] WhatsApp failed but email succeeded.");
-            }
-        } else {
-            console.log("[MONTHLY] WhatsApp skipped (WHATSAPP_ENABLED is not true).");
-        }
+        await sendPersonalizedNotificationsFromDB();
 
         const completedAt = new Date();
 
@@ -70,7 +46,7 @@ export async function runMonthlyNotification({ force = false } = {}, triggeredBy
         return "SUCCESS";
 
     } catch (err) {
-
+        const completedAt = new Date();
         await prisma.monthlyNotification.update({
             where: { id: record.id },
             data: {

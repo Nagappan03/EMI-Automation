@@ -5,64 +5,39 @@ const client = twilio(
     process.env.TWILIO_AUTH_TOKEN
 );
 
-export async function sendMonthlyWhatsApp({
-    month,
-    year,
-    sheetLink
+export async function sendWhatsAppMessage({
+    to,
+    name,
+    bank,
+    amount,
+    currentInstallment,
+    totalInstallments,
+    monthYear
 }) {
-    const monthName = new Date(year, month - 1).toLocaleString("en-IN", {
-        month: "long"
-    });
-
     try {
         if (!process.env.TWILIO_WHATSAPP_TEMPLATE_SID) {
             console.log("[WHATSAPP] Template SID missing. Skipping.");
-            return false;
+            return;
         }
 
-        const recipientsRaw = process.env.WHATSAPP_RECIPIENTS;
+        await client.messages.create({
+            from: process.env.TWILIO_WHATSAPP_FROM,
+            to,
+            contentSid: process.env.TWILIO_WHATSAPP_TEMPLATE_SID,
+            contentVariables: JSON.stringify({
+                "1": name,
+                "2": bank,
+                "3": monthYear,
+                "4": amount,
+                "5": String(currentInstallment),
+                "6": String(totalInstallments),
+                "7": process.env.GOOGLE_SHEET_LINK
+            })
+        });
 
-        if (!recipientsRaw) {
-            console.log("[WHATSAPP] No recipients configured. Skipping.");
-            return false;
-        }
-
-        const recipients = recipientsRaw
-            .split(",")
-            .map(r => r.trim())
-            .filter(Boolean);
-
-        let successCount = 0;
-
-        for (const to of recipients) {
-            try {
-                await client.messages.create({
-                    from: process.env.TWILIO_WHATSAPP_FROM,
-                    to,
-                    contentSid: process.env.TWILIO_WHATSAPP_TEMPLATE_SID,
-                    contentVariables: JSON.stringify({
-                        "1": String(monthName),
-                        "2": String(year),
-                        "3": String(sheetLink)
-                    })
-                });
-
-                console.log(`[WHATSAPP] Sent to ${to}`);
-                successCount++;
-
-            } catch (err) {
-                console.error(`[WHATSAPP ERROR] Failed for ${to}:`, err.message);
-            }
-        }
-
-        console.log(
-            `[WHATSAPP] ${successCount}/${recipients.length} messages sent`
-        );
-
-        return successCount > 0;
+        console.log(`[WHATSAPP] Sent to ${to}`);
 
     } catch (err) {
-        console.error("[WHATSAPP FATAL ERROR]", err.message);
-        return false;
+        console.error(`[WHATSAPP ERROR] Failed for ${to}:`, err.message);
     }
 }

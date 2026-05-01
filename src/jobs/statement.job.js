@@ -27,7 +27,8 @@ import prisma from "../lib/prisma.js";
  * Main job entry point
  * This is what /test-full-run and cron will call
  */
-export async function runStatementJob(triggeredBy = "CRON") {
+export async function runStatementJob(triggeredBy = "CRON", options = {}) {
+    const { force = false } = options;
     console.log("[JOB] Statement job started");
 
     const existingRunning = await prisma.jobRun.findFirst({
@@ -49,11 +50,14 @@ export async function runStatementJob(triggeredBy = "CRON") {
     let axisStatus = "SKIPPED";
     let kotakStatus = "SKIPPED";
     let hsbcStatus = "SKIPPED";
+    const results = [];
     let overallStatus = "SUCCESS";
     let errorMessage = null;
 
     try {
-        axisStatus = await processAxisStatement();
+        const axisResult = await processAxisStatement(force);
+        axisStatus = axisResult?.status || axisResult;
+        if (axisResult?.status === "SUCCESS") results.push(axisResult);
     } catch (err) {
         axisStatus = "FAILED";
         overallStatus = "FAILED";
@@ -63,7 +67,9 @@ export async function runStatementJob(triggeredBy = "CRON") {
     }
 
     try {
-        kotakStatus = await processKotakStatement();
+        const kotakResult = await processKotakStatement(force);
+        kotakStatus = kotakResult?.status || kotakResult;
+        if (kotakResult?.status === "SUCCESS") results.push(kotakResult);
     } catch (err) {
         kotakStatus = "FAILED";
         overallStatus = "FAILED";
@@ -73,7 +79,9 @@ export async function runStatementJob(triggeredBy = "CRON") {
     }
 
     try {
-        hsbcStatus = await processHsbcStatement();
+        const hsbcResult = await processHsbcStatement(force);
+        hsbcStatus = hsbcResult?.status || hsbcResult;
+        if (hsbcResult?.status === "SUCCESS") results.push(hsbcResult);
     } catch (err) {
         hsbcStatus = "FAILED";
         overallStatus = "FAILED";
@@ -114,7 +122,7 @@ export async function runStatementJob(triggeredBy = "CRON") {
 /**
  * Process Axis Bank credit card statement
  */
-async function processAxisStatement() {
+async function processAxisStatement(force = false) {
     console.log("[AXIS] Processing Axis Bank statement");
 
     // 1. Fetch Axis statement email + metadata
@@ -139,9 +147,13 @@ async function processAxisStatement() {
         where: { statementKey: axisData.statementKey }
     });
 
-    if (alreadyProcessed) {
+    if (alreadyProcessed && !force) {
         console.log("[AXIS] Already processed");
         return "SKIPPED";
+    }
+
+    if (alreadyProcessed && force) {
+        console.log("[AXIS] FORCE MODE — reprocessing statement");
     }
 
     console.log(`[AXIS] New statement detected: ${statementKey}`);
@@ -180,22 +192,37 @@ async function processAxisStatement() {
     );
 
     // 8. Mark statement as processed (idempotency lock)
-    await prisma.processedStatement.create({
-        data: {
+    await prisma.processedStatement.upsert({
+        where: { statementKey },
+        update: {
+            amount: emiAmount,
+            currentInstallment,
+            totalInstallments
+        },
+        create: {
             bank: "AXIS",
-            statementKey: axisData.statementKey
+            statementKey,
+            amount: emiAmount,
+            currentInstallment,
+            totalInstallments
         }
     });
 
     console.log('[AXIS] Successfully processed statement');
 
-    return "SUCCESS";
+    return {
+        status: "SUCCESS",
+        bank: "AXIS",
+        amount: emiAmount,
+        currentInstallment,
+        totalInstallments
+    };
 }
 
 /**
  * Process Kotak Bank credit card statement
  */
-async function processKotakStatement() {
+async function processKotakStatement(force = false) {
     console.log("[KOTAK] Processing Kotak Bank statement");
 
     const kotakData = await withRetry(
@@ -214,9 +241,13 @@ async function processKotakStatement() {
         where: { statementKey: kotakData.statementKey }
     });
 
-    if (alreadyProcessed) {
-        console.log('[KOTAK] Already processed');
+    if (alreadyProcessed && !force) {
+        console.log("[KOTAK] Already processed");
         return "SKIPPED";
+    }
+
+    if (alreadyProcessed && force) {
+        console.log("[KOTAK] FORCE MODE — reprocessing statement");
     }
 
     console.log(`[KOTAK] New statement detected: ${statementKey}`);
@@ -254,22 +285,37 @@ async function processKotakStatement() {
         { label: "Update Kotak tracker" }
     );
 
-    await prisma.processedStatement.create({
-        data: {
+    await prisma.processedStatement.upsert({
+        where: { statementKey },
+        update: {
+            amount,
+            currentInstallment,
+            totalInstallments
+        },
+        create: {
             bank: "KOTAK",
-            statementKey: kotakData.statementKey
+            statementKey,
+            amount,
+            currentInstallment,
+            totalInstallments
         }
     });
 
     console.log('[KOTAK] Successfully processed statement');
 
-    return "SUCCESS";
+    return {
+        status: "SUCCESS",
+        bank: "KOTAK",
+        amount,
+        currentInstallment,
+        totalInstallments
+    };
 }
 
 /**
  * Process HSBC Bank credit card statement
  */
-async function processHsbcStatement() {
+async function processHsbcStatement(force = false) {
 
     console.log("[HSBC] Processing HSBC Bank statement");
 
@@ -289,9 +335,13 @@ async function processHsbcStatement() {
         where: { statementKey }
     });
 
-    if (alreadyProcessed) {
+    if (alreadyProcessed && !force) {
         console.log("[HSBC] Already processed");
         return "SKIPPED";
+    }
+
+    if (alreadyProcessed && force) {
+        console.log("[HSBC] FORCE MODE — reprocessing statement");
     }
 
     console.log(`[HSBC] New statement detected: ${statementKey}`);
@@ -331,16 +381,31 @@ async function processHsbcStatement() {
         { label: "Update HSBC tracker" }
     );
 
-    await prisma.processedStatement.create({
-        data: {
+    await prisma.processedStatement.upsert({
+        where: { statementKey },
+        update: {
+            amount,
+            currentInstallment,
+            totalInstallments
+        },
+        create: {
             bank: "HSBC",
-            statementKey
+            statementKey,
+            amount,
+            currentInstallment,
+            totalInstallments
         }
     });
 
     console.log("[HSBC] Successfully processed statement");
 
-    return "SUCCESS";
+    return {
+        status: "SUCCESS",
+        bank: "HSBC",
+        amount,
+        currentInstallment,
+        totalInstallments
+    };
 }
 
 /**

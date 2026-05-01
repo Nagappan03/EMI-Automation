@@ -60,81 +60,38 @@ ${errorMessage || "Unknown error"}
     }
 }
 
-export async function sendMonthlyEmail() {
-    const now = new Date();
-    // Report the *next* month (the month the tracker update covers)
-    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    const monthName = nextMonth.toLocaleString("en-IN", { month: "long" });
-    const year = nextMonth.getFullYear();
+export async function sendEmail({ to, subject, body }) {
+    try {
+        const oauth2Client = getOAuthClient();
+        oauth2Client.setCredentials({
+            refresh_token: process.env.GMAIL_REFRESH_TOKEN
+        });
 
-    const oauth2Client = getOAuthClient();
-    oauth2Client.setCredentials({
-        refresh_token: process.env.GMAIL_REFRESH_TOKEN
-    });
+        const gmail = google.gmail({ version: "v1", auth: oauth2Client });
 
-    const gmail = google.gmail({ version: "v1", auth: oauth2Client });
+        const message = [
+            `From: "EMI Vault Solutions" <${process.env.ALERT_EMAIL_FROM}>`,
+            `To: ${to}`,
+            `Subject: ${subject}`,
+            "Content-Type: text/plain; charset=utf-8",
+            "",
+            body
+        ].join("\n");
 
-    const recipientsRaw = process.env.EMAIL_RECIPIENTS;
+        const encodedMessage = Buffer.from(message)
+            .toString("base64")
+            .replace(/\+/g, "-")
+            .replace(/\//g, "_")
+            .replace(/=+$/, "");
 
-    if (!recipientsRaw) {
-        console.log("[MONTHLY EMAIL] No recipients configured. Skipping.");
-        return false;
+        await gmail.users.messages.send({
+            userId: "me",
+            requestBody: { raw: encodedMessage }
+        });
+
+        console.log(`[EMAIL] Sent to ${to}`);
+
+    } catch (err) {
+        console.error(`[EMAIL ERROR] Failed for ${to}:`, err.message);
     }
-
-    const recipients = recipientsRaw
-        .split(",")
-        .map(r => r.trim())
-        .filter(Boolean);
-
-    const subject = `EMI Tracker Update Notification for ${monthName} ${year}`;
-
-    const body = `
-Hey,
-
-The Credit Card EMI Tracker has been updated for ${monthName} ${year}.
-
-You can view it here:
-${process.env.GOOGLE_SHEET_LINK}
-
-Regards,
-Nagappan S
-`;
-
-    let successCount = 0;
-
-    for (const to of recipients) {
-        try {
-            const message = [
-                `From: "EMI Tracker Automation Engine" <${process.env.ALERT_EMAIL_FROM}>`,
-                `To: ${to}`,
-                `Subject: ${subject}`,
-                "Content-Type: text/plain; charset=utf-8",
-                "",
-                body
-            ].join("\n");
-
-            const encodedMessage = Buffer.from(message)
-                .toString("base64")
-                .replace(/\+/g, "-")
-                .replace(/\//g, "_")
-                .replace(/=+$/, "");
-
-            await gmail.users.messages.send({
-                userId: "me",
-                requestBody: {
-                    raw: encodedMessage
-                }
-            });
-
-            console.log(`[MONTHLY EMAIL] Sent to ${to}`);
-            successCount++;
-
-        } catch (err) {
-            console.error(`[MONTHLY EMAIL ERROR] Failed for ${to}:`, err.message);
-        }
-    }
-
-    console.log(`[MONTHLY EMAIL] ${successCount}/${recipients.length} sent`);
-
-    return successCount > 0;
 }

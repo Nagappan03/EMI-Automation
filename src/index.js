@@ -131,7 +131,7 @@ app.get("/api/runs/:id", async (req, res) => {
 // Manual run
 app.post("/api/run-now", requireAdmin, async (req, res) => {
     try {
-        const result = await runStatementJob("MANUAL");
+        const result = await runStatementJob("MANUAL", { force: false });
         res.json({ status: result });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -142,7 +142,7 @@ app.post("/api/test-monthly-notifications", requireAdmin, async (req, res) => {
     try {
         console.log("[TEST] Manual monthly notification triggered");
 
-        await runMonthlyNotification({ force: true }, "MANUAL");
+        await runMonthlyNotification({ force: false }, "MANUAL");
 
         res.json({ status: "SUCCESS" });
     } catch (err) {
