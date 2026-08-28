@@ -172,6 +172,10 @@ async function processAxisStatement(force = false) {
     const { currentInstallment, totalInstallments } =
         extractAxisInstallmentInfo(statementText);
 
+    // Detect if EMI is completed or not
+    const emiCompleted =
+        currentInstallment >= totalInstallments;
+
     // 5. Extract EMI amount (principal + interest + GST)
     const emiAmount = extractAxisEmiAmount(statementText);
 
@@ -180,16 +184,23 @@ async function processAxisStatement(force = false) {
         getNextMonthYear(statementMonth, statementYear);
 
     // 7. Update Google Sheet (single row, deterministic)
-    await withRetry(
-        () => updateAxisTracker({
-            amount: emiAmount,
-            month: nextMonth,
-            year: nextYear,
-            totalInstallments,
-            currentInstallment
-        }),
-        { label: "Update Axis tracker" }
-    );
+    if (emiCompleted) {
+        console.log(
+            `[AXIS] EMI completed (${currentInstallment}/${totalInstallments}). ` +
+            `Skipping Google Sheet update.`
+        );
+    } else {
+        await withRetry(
+            () => updateAxisTracker({
+                amount: emiAmount,
+                month: nextMonth,
+                year: nextYear,
+                totalInstallments,
+                currentInstallment
+            }),
+            { label: "Update Axis tracker" }
+        );
+    }
 
     // 8. Mark statement as processed (idempotency lock)
     await prisma.processedStatement.upsert({
@@ -271,19 +282,29 @@ async function processKotakStatement(force = false) {
     const { currentInstallment, totalInstallments } =
         extractKotakInstallmentInfo(statementText);
 
+    const emiCompleted =
+        currentInstallment >= totalInstallments;
+
     const { month: nextMonth, year: nextYear } =
         getNextMonthYear(statementMonth, statementYear);
 
-    await withRetry(
-        () => updateKotakTracker({
-            amount,
-            month: nextMonth,
-            year: nextYear,
-            currentInstallment,
-            totalInstallments
-        }),
-        { label: "Update Kotak tracker" }
-    );
+    if (emiCompleted) {
+        console.log(
+            `[KOTAK] EMI completed (${currentInstallment}/${totalInstallments}). ` +
+            `Skipping Google Sheet update.`
+        );
+    } else {
+        await withRetry(
+            () => updateKotakTracker({
+                amount,
+                month: nextMonth,
+                year: nextYear,
+                currentInstallment,
+                totalInstallments
+            }),
+            { label: "Update Kotak tracker" }
+        );
+    }
 
     await prisma.processedStatement.upsert({
         where: { statementKey },
@@ -361,6 +382,9 @@ async function processHsbcStatement(force = false) {
         totalInstallments
     } = extractHsbcInstallmentInfo(statementText);
 
+    const emiCompleted =
+        currentInstallment >= totalInstallments;
+
     const { total: amount } = extractHsbcEmiAmount(statementText, ref);
 
     const now = new Date();
@@ -370,16 +394,23 @@ async function processHsbcStatement(force = false) {
             now.getFullYear()
         );
 
-    await withRetry(
-        () => updateHsbcTracker({
-            amount,
-            month: nextMonth,
-            year: nextYear,
-            currentInstallment,
-            totalInstallments
-        }),
-        { label: "Update HSBC tracker" }
-    );
+    if (emiCompleted) {
+        console.log(
+            `[HSBC] EMI completed (${currentInstallment}/${totalInstallments}). ` +
+            `Skipping Google Sheet update.`
+        );
+    } else {
+        await withRetry(
+            () => updateHsbcTracker({
+                amount,
+                month: nextMonth,
+                year: nextYear,
+                currentInstallment,
+                totalInstallments
+            }),
+            { label: "Update HSBC tracker" }
+        );
+    }
 
     await prisma.processedStatement.upsert({
         where: { statementKey },
