@@ -52,11 +52,37 @@ ${process.env.GOOGLE_SHEET_LINK}
 
 export async function sendPersonalizedNotificationsFromDB() {
 
-    console.log("[NOTIFICATION] Sending monthly personalized notifications");
+    console.log(
+        "[NOTIFICATION] Sending monthly personalized notifications"
+    );
 
-    // Get latest entry per bank
-    const latestData = await prisma.processedStatement.findMany({
-        distinct: ["bank"],
+    /*
+     * The monthly notification runs on the last day of the month.
+     *
+     * We need the statement belonging to THIS month.
+     *
+     * Example:
+     *
+     * September 30 notification
+     * → look for September statement
+     *
+     * October 31 notification
+     * → look for October statement
+     *
+     * This is important for completed EMIs:
+     * 6/6 in September must be sent.
+     * The same 6/6 record must NOT be sent again in October.
+     */
+    const now = new Date();
+
+    const notificationMonth = now.getMonth() + 1;
+    const notificationYear = now.getFullYear();
+
+    const monthlyData = await prisma.processedStatement.findMany({
+        where: {
+            statementMonth: notificationMonth,
+            statementYear: notificationYear
+        },
         orderBy: {
             processedAt: "desc"
         }
@@ -64,21 +90,13 @@ export async function sendPersonalizedNotificationsFromDB() {
 
     for (const user of userConfig) {
 
-        const data = latestData.find(d => d.bank === user.bank);
+        const data = monthlyData.find(
+            d => d.bank === user.bank
+        );
 
         if (!data) {
-            console.log(`[NOTIFICATION] No data for ${user.bank}`);
-            continue;
-        }
-
-        // EMI has been completely paid off.
-        // Do not send any further monthly notifications.
-        if (
-            data.currentInstallment >= data.totalInstallments
-        ) {
             console.log(
-                `[NOTIFICATION] ${data.bank} EMI completed ` +
-                `(${data.currentInstallment}/${data.totalInstallments}). Skipping.`
+                `[NOTIFICATION] No current-month data for ${user.bank}`
             );
             continue;
         }
@@ -91,7 +109,10 @@ export async function sendPersonalizedNotificationsFromDB() {
             totalInstallments: data.totalInstallments
         });
 
-        console.log(`[NOTIFICATION] ${user.name} → ${data.bank}`);
+        console.log(
+            `[NOTIFICATION] ${user.name} → ${data.bank}`
+        );
+
         console.log(message);
 
         // EMAIL

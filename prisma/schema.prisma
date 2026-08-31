@@ -20,13 +20,15 @@ model JobRun {
 }
 
 model ProcessedStatement {
-  id           String   @id @default(cuid())
-  bank         String
-  statementKey String   @unique
-  amount               Float?
-  currentInstallment   Int?
-  totalInstallments    Int?
-  processedAt  DateTime @default(now())
+  id                 String   @id @default(cuid())
+  bank               String
+  statementKey       String   @unique
+  amount             Float?
+  currentInstallment Int?
+  totalInstallments  Int?
+  statementMonth     Int?
+  statementYear      Int?
+  processedAt        DateTime @default(now())
 }
 
 model MonthlyNotification {

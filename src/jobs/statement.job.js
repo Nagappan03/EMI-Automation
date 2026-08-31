@@ -14,12 +14,13 @@ import { fetchHsbcStatement } from "../services/gmail.service.js";
 import { updateHsbcTracker } from "../services/sheets.service.js";
 import {
     extractHsbcInstallmentInfo,
-    extractHsbcEmiAmount
+    extractHsbcEmiAmount,
+    extractHsbcStatementMonthYear
 } from "../utils/hsbc.utils.js";
 
 import { withRetry } from "../utils/retry.utils.js";
 import { decryptAndExtractText } from "../services/pdf.service.js";
-import { getNextMonthYear } from "../utils/date.utils.js";
+import { getNextMonthYear, normalizeStatementMonth } from "../utils/date.utils.js";
 import { sendFailureAlertEmail } from "../services/email.service.js";
 import prisma from "../lib/prisma.js";
 
@@ -139,9 +140,12 @@ async function processAxisStatement(force = false) {
     const {
         statementKey,
         pdfPath,
-        statementMonth,
-        statementYear
+        statementMonth: rawStatementMonth,
+        statementYear: rawStatementYear
     } = axisData;
+
+    const statementMonth = normalizeStatementMonth(rawStatementMonth);
+    const statementYear = Number(rawStatementYear);
 
     const alreadyProcessed = await prisma.processedStatement.findUnique({
         where: { statementKey: axisData.statementKey }
@@ -208,14 +212,18 @@ async function processAxisStatement(force = false) {
         update: {
             amount: emiAmount,
             currentInstallment,
-            totalInstallments
+            totalInstallments,
+            statementMonth,
+            statementYear
         },
         create: {
             bank: "AXIS",
             statementKey,
             amount: emiAmount,
             currentInstallment,
-            totalInstallments
+            totalInstallments,
+            statementMonth,
+            statementYear
         }
     });
 
@@ -272,8 +280,13 @@ async function processKotakStatement(force = false) {
         { label: "Decrypt Kotak PDF" }
     );
 
-    const { statementMonth, statementYear } =
-        extractKotakMonthYear(statementText);
+    const {
+        statementMonth: rawStatementMonth,
+        statementYear: rawStatementYear
+    } = extractKotakMonthYear(statementText);
+
+    const statementMonth = normalizeStatementMonth(rawStatementMonth);
+    const statementYear = Number(rawStatementYear);
 
     const amount = extractKotakAmount(statementText);
 
@@ -311,14 +324,18 @@ async function processKotakStatement(force = false) {
         update: {
             amount,
             currentInstallment,
-            totalInstallments
+            totalInstallments,
+            statementMonth,
+            statementYear
         },
         create: {
             bank: "KOTAK",
             statementKey,
             amount,
             currentInstallment,
-            totalInstallments
+            totalInstallments,
+            statementMonth,
+            statementYear
         }
     });
 
@@ -412,19 +429,26 @@ async function processHsbcStatement(force = false) {
         );
     }
 
+    const { statementMonth, statementYear } =
+        extractHsbcStatementMonthYear(statementText);
+
     await prisma.processedStatement.upsert({
         where: { statementKey },
         update: {
             amount,
             currentInstallment,
-            totalInstallments
+            totalInstallments,
+            statementMonth,
+            statementYear
         },
         create: {
             bank: "HSBC",
             statementKey,
             amount,
             currentInstallment,
-            totalInstallments
+            totalInstallments,
+            statementMonth,
+            statementYear
         }
     });
 

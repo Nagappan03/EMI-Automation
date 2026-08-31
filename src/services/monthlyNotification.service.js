@@ -17,9 +17,13 @@ export async function runMonthlyNotification({ force = false } = {}, triggeredBy
         where: { month, year, type: "EMAIL", triggeredBy: "CRON" }
     });
 
-    if (existing?.status === "SUCCESS") {
+    if (existing?.status === "SUCCESS" && !force) {
         console.log("[MONTHLY] Already sent for this month");
         return "SKIPPED";
+    }
+
+    if (existing?.status === "SUCCESS" && force) {
+        console.log("[MONTHLY] FORCE MODE — re-sending monthly notifications");
     }
 
     const record = await prisma.monthlyNotification.create({

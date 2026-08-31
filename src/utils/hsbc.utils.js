@@ -1,6 +1,57 @@
 /**
  * Extract HSBC installment info (dynamic, merchant-based)
  */
+
+/**
+ * Extract HSBC statement closing month/year.
+ *
+ * Example:
+ * "17 FEB 2026 To 16 MAR 2026"
+ *
+ * Returns:
+ * {
+ *   statementMonth: 3,
+ *   statementYear: 2026
+ * }
+ */
+export function extractHsbcStatementMonthYear(text) {
+
+    const match = text.match(
+        /\d{2}\s+[A-Z]{3}\s+\d{4}\s+To\s+\d{2}\s+([A-Z]{3})\s+(\d{4})/i
+    );
+
+    if (!match) {
+        throw new Error("[HSBC] Statement month/year not found");
+    }
+
+    const monthMap = {
+        JAN: 1,
+        FEB: 2,
+        MAR: 3,
+        APR: 4,
+        MAY: 5,
+        JUN: 6,
+        JUL: 7,
+        AUG: 8,
+        SEP: 9,
+        OCT: 10,
+        NOV: 11,
+        DEC: 12
+    };
+
+    const month = monthMap[match[1].toUpperCase()];
+    const year = Number(match[2]);
+
+    if (!month || !year) {
+        throw new Error("[HSBC] Invalid statement month/year");
+    }
+
+    return {
+        statementMonth: month,
+        statementYear: year
+    };
+}
+
 export function extractHsbcInstallmentInfo(text, merchantName = "FORERUN SYSTEMS") {
 
     const chunks = text.split(/(?=\d{2}[A-Z]{3})/g);
