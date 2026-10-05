@@ -19,7 +19,7 @@ export const userConfig = [
     },
     {
         name: "Nags",
-        bank: "HSBC",
+        bank: "AXIS",
         email: "nagappans22@gmail.com",
         phone: "whatsapp:+916369837476"
     }
