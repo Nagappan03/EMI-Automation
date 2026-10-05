@@ -55,40 +55,55 @@ export async function runStatementJob(triggeredBy = "CRON", options = {}) {
     let overallStatus = "SUCCESS";
     let errorMessage = null;
 
-    try {
-        const axisResult = await processAxisStatement(force);
-        axisStatus = axisResult?.status || axisResult;
-        if (axisResult?.status === "SUCCESS") results.push(axisResult);
-    } catch (err) {
-        axisStatus = "FAILED";
-        overallStatus = "FAILED";
-        errorMessage = errorMessage
-            ? errorMessage + ` | Axis: ${err.message}`
-            : `Axis: ${err.message}`;
+    if (process.env.ENABLE_AXIS_PROCESSING === "true") {
+        try {
+            const axisResult = await processAxisStatement(force);
+            axisStatus = axisResult?.status || axisResult;
+            if (axisResult?.status === "SUCCESS") results.push(axisResult);
+        } catch (err) {
+            axisStatus = "FAILED";
+            overallStatus = "FAILED";
+            errorMessage = errorMessage
+                ? errorMessage + ` | Axis: ${err.message}`
+                : `Axis: ${err.message}`;
+        }
+    } else {
+        console.log("[AXIS] Processing disabled");
+        axisStatus = "DISABLED";
     }
 
-    try {
-        const kotakResult = await processKotakStatement(force);
-        kotakStatus = kotakResult?.status || kotakResult;
-        if (kotakResult?.status === "SUCCESS") results.push(kotakResult);
-    } catch (err) {
-        kotakStatus = "FAILED";
-        overallStatus = "FAILED";
-        errorMessage = errorMessage
-            ? errorMessage + ` | Kotak: ${err.message}`
-            : `Kotak: ${err.message}`;
+    if (process.env.ENABLE_KOTAK_PROCESSING === "true") {
+        try {
+            const kotakResult = await processKotakStatement(force);
+            kotakStatus = kotakResult?.status || kotakResult;
+            if (kotakResult?.status === "SUCCESS") results.push(kotakResult);
+        } catch (err) {
+            kotakStatus = "FAILED";
+            overallStatus = "FAILED";
+            errorMessage = errorMessage
+                ? errorMessage + ` | Kotak: ${err.message}`
+                : `Kotak: ${err.message}`;
+        }
+    } else {
+        console.log("[KOTAK] Processing disabled");
+        kotakStatus = "DISABLED";
     }
 
-    try {
-        const hsbcResult = await processHsbcStatement(force);
-        hsbcStatus = hsbcResult?.status || hsbcResult;
-        if (hsbcResult?.status === "SUCCESS") results.push(hsbcResult);
-    } catch (err) {
-        hsbcStatus = "FAILED";
-        overallStatus = "FAILED";
-        errorMessage = errorMessage
-            ? errorMessage + ` | HSBC: ${err.message}`
-            : `HSBC: ${err.message}`;
+    if (process.env.ENABLE_HSBC_PROCESSING === "true") {
+        try {
+            const hsbcResult = await processHsbcStatement(force);
+            hsbcStatus = hsbcResult?.status || hsbcResult;
+            if (hsbcResult?.status === "SUCCESS") results.push(hsbcResult);
+        } catch (err) {
+            hsbcStatus = "FAILED";
+            overallStatus = "FAILED";
+            errorMessage = errorMessage
+                ? errorMessage + ` | HSBC: ${err.message}`
+                : `HSBC: ${err.message}`;
+        }
+    } else {
+        console.log("[HSBC] Processing disabled");
+        hsbcStatus = "DISABLED";
     }
 
     const completedAt = new Date();
